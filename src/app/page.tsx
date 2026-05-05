@@ -40,7 +40,7 @@ import {
   Legend
 } from 'recharts';
 import { differenceInDays, format, subDays, isSameDay, addDays } from 'date-fns';
-import { getSessions, saveSession, deleteSession, clearAllSessions, type StudySession } from '@/lib/actions';
+import { getSessions, saveSession, deleteSession, clearAllSessions, getDailyTasks, toggleDailyTask, type StudySession, type DailyTask } from '@/lib/actions';
 
 const SYLLABUS_TOPICS = [
   { id: 'quants', name: 'Quantitative Aptitude', totalQuestions: 2000, expectedHours: 150, colorClass: styles.fillQuants, color: '#8B5CF6' },
@@ -76,6 +76,7 @@ export default function Dashboard() {
   const [expandedTopic, setExpandedTopic] = useState<string | null>(null);
   const [syllabusSearch, setSyllabusSearch] = useState('');
   const [coverageFilter, setCoverageFilter] = useState<'all' | 'covered' | 'pending'>('all');
+  const [dailyTasks, setDailyTasks] = useState<DailyTask[]>([]);
 
   // Modal & Timer State
   const [modalState, setModalState] = useState<'closed' | 'setup' | 'save' | 'add_topic'>('closed');
@@ -98,10 +99,11 @@ export default function Dashboard() {
 
     const loadData = async () => {
       try {
-        const data = await getSessions();
-        setSessions(data);
+        const [sessionData, taskData] = await Promise.all([getSessions(), getDailyTasks()]);
+        setSessions(sessionData);
+        setDailyTasks(taskData);
       } catch (err) {
-        console.error("Failed to load sessions:", err);
+        console.error("Failed to load data:", err);
       } finally {
         setLoading(false);
       }
@@ -200,6 +202,31 @@ export default function Dashboard() {
       }
     }
   };
+
+  const handleToggleSudoku = async () => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const existing = dailyTasks.find(t => t.date === today && t.taskName === 'Sudoku');
+    const newCompleted = !existing?.completed;
+    
+    const task: DailyTask = {
+      id: existing?.id || Date.now().toString(),
+      date: today,
+      taskName: 'Sudoku',
+      completed: newCompleted
+    };
+
+    try {
+      await toggleDailyTask(task.id, task.date, task.taskName, task.completed);
+      setDailyTasks(prev => {
+        const other = prev.filter(t => !(t.date === today && t.taskName === 'Sudoku'));
+        return [...other, task];
+      });
+    } catch (err) {
+      alert("Failed to update Sudoku status.");
+    }
+  };
+
+  const isSudokuDoneToday = dailyTasks.some(t => t.date === format(new Date(), 'yyyy-MM-dd') && t.taskName === 'Sudoku' && t.completed);
 
   const handleClearHistory = async () => {
     if (confirm("Are you sure you want to clear ALL study history? This action cannot be undone and will delete all data from the cloud.")) {
@@ -736,6 +763,27 @@ export default function Dashboard() {
             </div>
             
             <div className={styles.dashboardSideCol}>
+              <section className={styles.section}>
+                <h2 className={styles.sectionTitle}><CheckCircle2 size={24} color="#10B981" /> Daily Mental Warmup</h2>
+                <div style={{ padding: '1rem', background: 'var(--bg-main)', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                     <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(139, 92, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                       <TrendingUp size={20} color="#8B5CF6" />
+                     </div>
+                     <div>
+                       <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>Sudoku Challenge</div>
+                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Sharpen your logic for DILR</div>
+                     </div>
+                   </div>
+                   <input 
+                     type="checkbox" 
+                     checked={isSudokuDoneToday} 
+                     onChange={handleToggleSudoku}
+                     style={{ width: '24px', height: '24px', cursor: 'pointer' }} 
+                   />
+                </div>
+              </section>
+
               <section className={styles.section}><h2 className={styles.sectionTitle}><Info size={24} color="#F59E0B" /> CAT Exam Pattern</h2><div className={styles.examPatternGrid}><div className={styles.patternCard}><div className={styles.patternLabel}>Total Time</div><div className={styles.patternValue}>120 Mins</div></div><div className={styles.patternCard}><div className={styles.patternLabel}>Questions</div><div className={styles.patternValue}>68 Qs</div></div><div className={styles.patternCard}><div className={styles.patternLabel}>Total Marks</div><div className={styles.patternValue}>204 Marks</div></div><div className={styles.patternCard}><div className={styles.patternLabel}>Slots</div><div className={styles.patternValue}>3 Slots</div></div></div>
                   <div className={styles.weightageHeader}><TrendingUp size={20} color="#8B5CF6" /><span>Quants Topic Weightage (Recent Trends)</span></div>
                   <table className={styles.weightageTable}><thead><tr><th>Topic Group</th><th>Avg. Questions</th></tr></thead><tbody><tr><td>Arithmetic (Avg, Ratio, P&L, TSD)</td><td>8 - 10 Qs</td></tr><tr><td>Algebra (Equations, Log, Progressions)</td><td>6 - 8 Qs</td></tr><tr><td>Geometry & Mensuration</td><td>3 - 4 Qs</td></tr><tr><td>Number System</td><td>2 - 3 Qs</td></tr><tr><td>Modern Maths (P&C, Prob)</td><td>1 - 2 Qs</td></tr></tbody></table>
@@ -751,6 +799,31 @@ export default function Dashboard() {
           <div className={styles.analyticsGrid}>
             <div className={styles.analyticsCard}><h2 className={styles.sectionTitle}><BarChart3 size={24} color="#8B5CF6" /> Sectional Breakdown</h2><div style={{ height: '300px', width: '100%' }}><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={generatePieData()} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">{generatePieData().map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}</Pie><Tooltip content={<CustomTooltip />} /><Legend verticalAlign="bottom" height={36}/></PieChart></ResponsiveContainer></div></div>
             <div className={styles.analyticsCard}><h2 className={styles.sectionTitle}><TrendingUp size={24} color="#10B981" /> Daily Progress (14 Days)</h2><div style={{ height: '300px', width: '100%' }}><ResponsiveContainer width="100%" height="100%"><BarChart data={generateDetailedDailyData()}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" /><XAxis dataKey="name" fontSize={10} axisLine={false} tickLine={false} /><YAxis axisLine={false} tickLine={false} /><Tooltip content={<CustomTooltip />} /><Legend /><Bar dataKey="Quants" stackId="a" fill="#8B5CF6" /><Bar dataKey="Verbal" stackId="a" fill="#10B981" /><Bar dataKey="DILR" stackId="a" fill="#06B6D4" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div></div>
+            <div className={styles.analyticsCard}>
+              <h2 className={styles.sectionTitle}><TrendingUp size={24} color="#8B5CF6" /> Sudoku Consistency (30 Days)</h2>
+              <div className={styles.sudokuConsistencyGrid}>
+                {Array.from({ length: 30 }).map((_, i) => {
+                  const d = subDays(new Date(), 29 - i);
+                  const dateStr = format(d, 'yyyy-MM-dd');
+                  const isDone = dailyTasks.some(t => t.date === dateStr && t.taskName === 'Sudoku' && t.completed);
+                  return (
+                    <div 
+                      key={dateStr} 
+                      title={format(d, 'MMM dd, yyyy')}
+                      style={{ 
+                        width: '18px', 
+                        height: '18px', 
+                        borderRadius: '4px', 
+                        background: isDone ? '#8B5CF6' : 'rgba(0,0,0,0.05)',
+                        border: '1px solid rgba(0,0,0,0.05)',
+                        transition: 'all 0.2s'
+                      }} 
+                    />
+                  );
+                })}
+              </div>
+              <p style={{ marginTop: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Sudoku improves your logic and number-crunching speed, which is vital for the DILR and Quants sections.</p>
+            </div>
           </div>
           <section className={styles.section} style={{ marginTop: '2rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>

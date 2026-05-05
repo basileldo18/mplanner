@@ -78,3 +78,44 @@ export async function clearAllSessions() {
     throw new Error('Database clear failed');
   }
 }
+
+export type DailyTask = {
+  id: string;
+  date: string;
+  taskName: string;
+  completed: boolean;
+};
+
+export async function getDailyTasks(): Promise<DailyTask[]> {
+  try {
+    const result = await sql`
+      SELECT id, date::text, task_name as "taskName", completed
+      FROM daily_tasks
+      ORDER BY date DESC
+    `;
+    return result.map(row => ({
+      id: row.id,
+      date: row.date,
+      taskName: row.taskName,
+      completed: row.completed
+    }));
+  } catch (error) {
+    console.error('Failed to fetch daily tasks:', error);
+    return [];
+  }
+}
+
+export async function toggleDailyTask(id: string, date: string, taskName: string, completed: boolean) {
+  try {
+    await sql`
+      INSERT INTO daily_tasks (id, date, task_name, completed)
+      VALUES (${id}, ${date}, ${taskName}, ${completed})
+      ON CONFLICT (date, task_name) DO UPDATE SET
+        completed = EXCLUDED.completed
+    `;
+    revalidatePath('/');
+  } catch (error) {
+    console.error('Failed to toggle daily task:', error);
+    throw new Error('Database update failed');
+  }
+}

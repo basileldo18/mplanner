@@ -7,3 +7,11 @@ CREATE TABLE sessions (
   questions_done INTEGER DEFAULT 0,
   concept_mastered BOOLEAN DEFAULT FALSE
 );
+
+CREATE TABLE daily_tasks (
+  id TEXT PRIMARY KEY,
+  date DATE NOT NULL,
+  task_name TEXT NOT NULL,
+  completed BOOLEAN DEFAULT FALSE,
+  UNIQUE(date, task_name)
+);

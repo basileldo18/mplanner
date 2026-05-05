@@ -180,7 +180,7 @@
 }
 
 .chartContainer {
-  height: 300px;
+  height: 280px;
   width: 100%;
 }
 
@@ -1258,9 +1258,10 @@
 
 .dashboardGrid {
   display: grid;
-  grid-template-columns: 1fr 400px;
+  grid-template-columns: 1fr 1fr;
   gap: 2rem;
   margin-top: 2rem;
+  align-items: start;
 }
 
 .missionCard {
@@ -1434,4 +1435,21 @@
   .roadmapLine {
     display: none;
   }
+}
+.sudokuConsistencyGrid {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
+  background: var(--bg-main);
+  padding: 1.5rem;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  max-width: 450px;
+  width: fit-content;
+}
+
+.narrowSection {
+  max-width: 700px;
+  width: 100%;
 }
