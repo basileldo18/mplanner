@@ -5,7 +5,9 @@ CREATE TABLE sessions (
   sub_topics TEXT[] NOT NULL,
   time_spent FLOAT NOT NULL,
   questions_done INTEGER DEFAULT 0,
-  concept_mastered BOOLEAN DEFAULT FALSE
+  concept_mastered BOOLEAN DEFAULT FALSE,
+  is_practice BOOLEAN DEFAULT FALSE,
+  topic_questions JSONB
 );
 
 CREATE TABLE daily_tasks (

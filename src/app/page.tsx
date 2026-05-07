@@ -88,6 +88,8 @@ export default function Dashboard() {
   // Form State after studying
   const [questionsDone, setQuestionsDone] = useState('');
   const [conceptMastered, setConceptMastered] = useState(false);
+  const [isPractice, setIsPractice] = useState(false);
+  const [topicQuestions, setTopicQuestions] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setMounted(true);
@@ -156,7 +158,11 @@ export default function Dashboard() {
       subTopics: [...activeTopics],
       timeSpent: timeSpentHours,
       questionsDone: Number(questionsDone) || 0,
-      conceptMastered
+      conceptMastered,
+      isPractice,
+      topicQuestions: Object.fromEntries(
+        Object.entries(topicQuestions).map(([k, v]) => [k, Number(v) || 0])
+      )
     };
 
     try {
@@ -164,6 +170,8 @@ export default function Dashboard() {
       setSessions(prev => [newSession, ...prev]);
       setQuestionsDone('');
       setConceptMastered(false);
+      setIsPractice(false);
+      setTopicQuestions({});
       setActiveTopics([]);
       setModalState('closed');
     } catch (err) {
@@ -192,7 +200,8 @@ export default function Dashboard() {
         subTopics: [topicName],
         timeSpent: 0,
         questionsDone: 0,
-        conceptMastered: true
+        conceptMastered: true,
+        isPractice: false
       };
       try {
         await saveSession(manualSession);
@@ -485,6 +494,32 @@ export default function Dashboard() {
     });
   };
 
+  const getTopicStats = () => {
+    const topicMap: Record<string, { time: number, qs: number, mastered: boolean, section: string }> = {};
+    
+    // Initialize with all topics
+    Object.entries(CAT_SYLLABUS).forEach(([section, categories]) => {
+      categories.forEach(cat => {
+        cat.topics.forEach(topic => {
+          topicMap[topic] = { time: 0, qs: 0, mastered: false, section };
+        });
+      });
+    });
+
+    sessions.forEach(s => {
+      if (s.subTopics) {
+        s.subTopics.forEach(topic => {
+          if (topicMap[topic]) {
+            topicMap[topic].time += s.timeSpent;
+            topicMap[topic].qs += s.topicQuestions?.[topic] || 0;
+            if (s.conceptMastered) topicMap[topic].mastered = true;
+          }
+        });
+      }
+    });
+    return topicMap;
+  };
+
   const generateConsistencyBoxes = () => {
     const boxes = [];
     const sessionDates = new Set(sessions.map(s => new Date(s.date).toDateString()));
@@ -546,8 +581,8 @@ export default function Dashboard() {
           </nav>
         </div>
         
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <button onClick={() => setModalState('setup')} disabled={isTimerActive} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: isTimerActive ? 'var(--text-muted)' : 'var(--accent-primary)', color: 'white', border: 'none', padding: '0.75rem 1.25rem', borderRadius: '8px', fontWeight: 600, cursor: isTimerActive ? 'not-allowed' : 'pointer', transition: 'background 0.2s' }}><Play size={20} fill="currentColor" /> {isTimerActive ? 'Session Active' : 'Start Session'}</button>
+        <div className={styles.headerRight}>
+
           <div className={styles.countdownCard} style={{ borderColor: 'var(--accent-secondary)' }}><Target size={32} color="var(--accent-secondary)" /><div><div className={styles.countdownValue} style={{ color: 'var(--accent-secondary)' }}>{phaseInfo.daysLeft}</div><div className={styles.countdownLabel}>Days left in {phaseInfo.id === 1 ? 'Phase 1' : phaseInfo.id === 2 ? 'Phase 2' : 'Phase 3'}</div></div></div>
           <div className={styles.countdownCard}><CalendarDays size={32} color="#06B6D4" /><div><div className={styles.countdownValue}>{daysLeft}</div><div className={styles.countdownLabel}>Days until CAT</div></div></div>
         </div>
@@ -558,7 +593,7 @@ export default function Dashboard() {
           <div className={styles.activeSessionInfo}>
             <div className={styles.activeSessionPulse}></div>
             <div>
-              <strong style={{ display: 'block', fontSize: '0.9rem' }}>STUDYING NOW</strong>
+              <strong style={{ display: 'block', fontSize: '0.9rem' }}>{isPractice ? 'PRACTICING NOW' : 'STUDYING NOW'}</strong>
               <span style={{ opacity: 0.9, fontSize: '0.8rem' }}>{activeSection.toUpperCase()} &bull; {activeTopics.join(', ')}</span>
             </div>
           </div>
@@ -643,6 +678,11 @@ export default function Dashboard() {
                   </select>
                 </div>
 
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', margin: '1rem 0', padding: '1rem', background: 'rgba(139, 92, 246, 0.05)', borderRadius: '12px', border: '1px solid rgba(139, 92, 246, 0.1)' }}>
+                  <input type="checkbox" id="practice" checked={isPractice} onChange={e => setIsPractice(e.target.checked)} style={{ width: '22px', height: '22px', cursor: 'pointer' }} />
+                  <label htmlFor="practice" style={{ fontSize: '1rem', fontWeight: 600, cursor: 'pointer', color: 'var(--accent-primary)' }}>This is a Question Practice Session</label>
+                </div>
+
                 <button className={styles.btnPrimary} onClick={handleStartStudy} disabled={activeTopics.length === 0} style={{ marginTop: '1rem', opacity: activeTopics.length === 0 ? 0.5 : 1 }}>
                   <Play size={20} fill="currentColor" /> Let's Go! Start Studying
                 </button>
@@ -656,17 +696,42 @@ export default function Dashboard() {
                   <div style={{ fontSize: '3.5rem', fontWeight: 800, color: 'var(--accent-primary)', letterSpacing: '-2px' }}>{formatTime(elapsedSeconds)}</div>
                 </div>
                 
-                <div className={styles.formGroup}>
-                  <label>Questions Conquered</label>
-                  <input className={styles.formInput} type="number" min="0" value={questionsDone} onChange={e => setQuestionsDone(e.target.value)} placeholder="How many problems did you solve?" />
-                </div>
+                {isPractice && activeTopics.length > 1 ? (
+                  activeTopics.map(topic => (
+                    <div key={topic} className={styles.formGroup} style={{ marginBottom: '1rem' }}>
+                      <label style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Questions for {topic}</label>
+                      <input 
+                        className={styles.formInput} 
+                        type="number" 
+                        min="0" 
+                        value={topicQuestions[topic] || ''} 
+                        onChange={e => {
+                          const val = e.target.value;
+                          setTopicQuestions(prev => ({ ...prev, [topic]: val }));
+                          // Also update total questionsDone
+                          const newTopics = { ...topicQuestions, [topic]: val };
+                          const total = Object.values(newTopics).reduce((sum, v) => sum + (Number(v) || 0), 0);
+                          setQuestionsDone(total.toString());
+                        }} 
+                        placeholder={`How many problems for ${topic}?`} 
+                      />
+                    </div>
+                  ))
+                ) : (
+                  <div className={styles.formGroup}>
+                    <label>{isPractice ? "Total Questions Solved" : "Questions Conquered"}</label>
+                    <input className={styles.formInput} type="number" min="0" value={questionsDone} onChange={e => setQuestionsDone(e.target.value)} placeholder="How many problems did you solve?" />
+                  </div>
+                )}
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', margin: '1rem 0', padding: '1rem', background: 'rgba(16, 185, 129, 0.05)', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
                   <input type="checkbox" id="concept" checked={conceptMastered} onChange={e => setConceptMastered(e.target.checked)} style={{ width: '22px', height: '22px', cursor: 'pointer' }} />
                   <label htmlFor="concept" style={{ fontSize: '1rem', fontWeight: 600, cursor: 'pointer', color: '#059669' }}>I've mastered this concept today!</label>
                 </div>
 
-                <button type="submit" className={styles.btnSuccess} style={{ marginTop: '1rem' }}>Log My Victory</button>
+                <button type="submit" className={styles.btnSuccess} style={{ marginTop: '1rem' }}>
+                  {isPractice ? 'Log Practice Results' : 'Log My Victory'}
+                </button>
               </form>
             )}
           </div>
@@ -786,8 +851,12 @@ export default function Dashboard() {
 
               <section className={styles.section}><h2 className={styles.sectionTitle}><Info size={24} color="#F59E0B" /> CAT Exam Pattern</h2><div className={styles.examPatternGrid}><div className={styles.patternCard}><div className={styles.patternLabel}>Total Time</div><div className={styles.patternValue}>120 Mins</div></div><div className={styles.patternCard}><div className={styles.patternLabel}>Questions</div><div className={styles.patternValue}>68 Qs</div></div><div className={styles.patternCard}><div className={styles.patternLabel}>Total Marks</div><div className={styles.patternValue}>204 Marks</div></div><div className={styles.patternCard}><div className={styles.patternLabel}>Slots</div><div className={styles.patternValue}>3 Slots</div></div></div>
                   <div className={styles.weightageHeader}><TrendingUp size={20} color="#8B5CF6" /><span>Quants Topic Weightage (Recent Trends)</span></div>
-                  <table className={styles.weightageTable}><thead><tr><th>Topic Group</th><th>Avg. Questions</th></tr></thead><tbody><tr><td>Arithmetic (Avg, Ratio, P&L, TSD)</td><td>8 - 10 Qs</td></tr><tr><td>Algebra (Equations, Log, Progressions)</td><td>6 - 8 Qs</td></tr><tr><td>Geometry & Mensuration</td><td>3 - 4 Qs</td></tr><tr><td>Number System</td><td>2 - 3 Qs</td></tr><tr><td>Modern Maths (P&C, Prob)</td><td>1 - 2 Qs</td></tr></tbody></table>
-                  <table className={styles.patternTable}><thead><tr><th>Section</th><th>Questions</th><th>Marking (MCQ)</th><th>Marking (TITA)</th></tr></thead><tbody><tr><td>VARC</td><td>24 Qs</td><td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`}>-1</span></td><td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`} style={{ background: 'rgba(0,0,0,0.05)', color: 'var(--text-muted)' }}>0</span></td></tr><tr><td>DILR</td><td>22 Qs</td><td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`}>-1</span></td><td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`} style={{ background: 'rgba(0,0,0,0.05)', color: 'var(--text-muted)' }}>0</span></td></tr><tr><td>Quants</td><td>22 Qs</td><td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`}>-1</span></td><td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`} style={{ background: 'rgba(0,0,0,0.05)', color: 'var(--text-muted)' }}>0</span></td></tr></tbody></table>
+                  <div style={{ overflowX: 'auto', width: '100%' }}>
+                    <table className={styles.weightageTable}><thead><tr><th>Topic Group</th><th>Avg. Questions</th></tr></thead><tbody><tr><td>Arithmetic (Avg, Ratio, P&L, TSD)</td><td>8 - 10 Qs</td></tr><tr><td>Algebra (Equations, Log, Progressions)</td><td>6 - 8 Qs</td></tr><tr><td>Geometry & Mensuration</td><td>3 - 4 Qs</td></tr><tr><td>Number System</td><td>2 - 3 Qs</td></tr><tr><td>Modern Maths (P&C, Prob)</td><td>1 - 2 Qs</td></tr></tbody></table>
+                  </div>
+                  <div style={{ overflowX: 'auto', width: '100%' }}>
+                    <table className={styles.patternTable}><thead><tr><th>Section</th><th>Questions</th><th>Marking (MCQ)</th><th>Marking (TITA)</th></tr></thead><tbody><tr><td>VARC</td><td>24 Qs</td><td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`}>-1</span></td><td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`} style={{ background: 'rgba(0,0,0,0.05)', color: 'var(--text-muted)' }}>0</span></td></tr><tr><td>DILR</td><td>22 Qs</td><td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`}>-1</span></td><td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`} style={{ background: 'rgba(0,0,0,0.05)', color: 'var(--text-muted)' }}>0</span></td></tr><tr><td>Quants</td><td>22 Qs</td><td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`}>-1</span></td><td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`} style={{ background: 'rgba(0,0,0,0.05)', color: 'var(--text-muted)' }}>0</span></td></tr></tbody></table>
+                  </div>
               </section>
             </div>
           </div>
@@ -824,6 +893,50 @@ export default function Dashboard() {
               </div>
               <p style={{ marginTop: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Sudoku improves your logic and number-crunching speed, which is vital for the DILR and Quants sections.</p>
             </div>
+
+            <div className={styles.analyticsCard} style={{ gridColumn: '1 / -1', marginTop: '1rem' }}>
+              <h2 className={styles.sectionTitle}><BookOpen size={24} color="#8B5CF6" /> Topic-wise Progress Tracking</h2>
+              <div style={{ overflowX: 'auto', marginTop: '1.5rem' }}>
+                <table className={styles.historyTable}>
+                  <thead>
+                    <tr>
+                      <th>Topic</th>
+                      <th>Section</th>
+                      <th>Study Time</th>
+                      <th>Practice Qs</th>
+                      <th>Progress Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(getTopicStats()).sort((a, b) => b[1].qs - a[1].qs).map(([topic, stats]) => (
+                      <tr key={topic} style={{ opacity: stats.qs > 0 || stats.time > 0 ? 1 : 0.6 }}>
+                        <td style={{ fontWeight: 700 }}>{topic}</td>
+                        <td>
+                          <span className={`${styles.sessionBadge} ${stats.section === 'quants' ? styles.badgeQuants : stats.section === 'verbal' ? styles.badgeVerbal : styles.badgeDILR}`}>
+                            {stats.section.toUpperCase()}
+                          </span>
+                        </td>
+                        <td>{stats.time.toFixed(1)}h</td>
+                        <td style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>{stats.qs} Qs</td>
+                        <td>
+                          {stats.mastered ? (
+                            <span style={{ color: '#10B981', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', fontWeight: 700 }}>
+                              <CheckCircle2 size={16} /> MASTERED
+                            </span>
+                          ) : stats.qs > 0 ? (
+                            <span style={{ color: '#F59E0B', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', fontWeight: 700 }}>
+                              <TrendingUp size={16} /> IN PRACTICE
+                            </span>
+                          ) : (
+                            <span style={{ color: '#94A3B8', fontSize: '0.8rem' }}>NOT STARTED</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
           <section className={styles.section} style={{ marginTop: '2rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -834,8 +947,8 @@ export default function Dashboard() {
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table className={styles.historyTable}>
-                <thead><tr><th>Date</th><th>Section</th><th>Time Spent</th><th>Questions</th><th>Mastery</th></tr></thead>
-                <tbody>{sessions.length > 0 ? sessions.map((session) => (<tr key={session.id}><td><div className={styles.sessionDate}>{format(new Date(session.date), 'MMM dd, yyyy')}</div><div style={{ fontSize: '0.7rem', color: '#9CA3AF' }}>{format(new Date(session.date), 'hh:mm a')}</div></td><td><span className={`${styles.sessionBadge} ${session.topic === 'quants' ? styles.badgeQuants : session.topic === 'verbal' ? styles.badgeVerbal : styles.badgeDILR}`}>{session.topic.toUpperCase()}</span></td><td style={{ fontWeight: 600 }}>{session.timeSpent.toFixed(2)}h</td><td>{session.questionsDone} Qs</td><td>{session.conceptMastered ? (<span style={{ color: '#10B981', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', fontWeight: 600 }}><CheckCircle2 size={14} /> Mastered</span>) : '-'}</td></tr>)) : (<tr><td colSpan={5} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>No sessions logged yet. Start studying to see your history!</td></tr>)}</tbody>
+                <thead><tr><th>Date</th><th>Section</th><th>Type</th><th>Time Spent</th><th>Questions</th><th>Mastery</th></tr></thead>
+                <tbody>{sessions.length > 0 ? sessions.map((session) => (<tr key={session.id}><td><div className={styles.sessionDate}>{format(new Date(session.date), 'MMM dd, yyyy')}</div><div style={{ fontSize: '0.7rem', color: '#9CA3AF' }}>{format(new Date(session.date), 'hh:mm a')}</div></td><td><span className={`${styles.sessionBadge} ${session.topic === 'quants' ? styles.badgeQuants : session.topic === 'verbal' ? styles.badgeVerbal : styles.badgeDILR}`}>{session.topic.toUpperCase()}</span></td><td>{session.isPractice ? <span style={{ color: 'var(--accent-primary)', fontSize: '0.7rem', fontWeight: 700, background: 'rgba(139, 92, 246, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>PRACTICE</span> : <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem', border: '1px solid var(--border-color)', padding: '2px 6px', borderRadius: '4px' }}>LEARNING</span>}</td><td style={{ fontWeight: 600 }}>{session.timeSpent.toFixed(2)}h</td><td>{session.questionsDone} Qs</td><td>{session.conceptMastered ? (<span style={{ color: '#10B981', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', fontWeight: 600 }}><CheckCircle2 size={14} /> Mastered</span>) : '-'}</td></tr>)) : (<tr><td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>No sessions logged yet. Start studying to see your history!</td></tr>)}</tbody>
               </table>
             </div>
           </section>

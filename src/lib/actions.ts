@@ -12,13 +12,16 @@ export type StudySession = {
   timeSpent: number;
   questionsDone: number;
   conceptMastered: boolean;
+  isPractice: boolean;
+  topicQuestions?: Record<string, number>;
 };
 
 export async function getSessions(): Promise<StudySession[]> {
   try {
     const result = await sql`
       SELECT id, date, section as topic, sub_topics as "subTopics", time_spent as "timeSpent", 
-             questions_done as "questionsDone", concept_mastered as "conceptMastered"
+             questions_done as "questionsDone", concept_mastered as "conceptMastered",
+             is_practice as "isPractice", topic_questions as "topicQuestions"
       FROM sessions
       ORDER BY date DESC
     `;
@@ -31,7 +34,9 @@ export async function getSessions(): Promise<StudySession[]> {
       subTopics: row.subTopics || [],
       timeSpent: parseFloat(row.timeSpent),
       questionsDone: parseInt(row.questionsDone),
-      conceptMastered: row.conceptMastered
+      conceptMastered: row.conceptMastered,
+      isPractice: row.isPractice || false,
+      topicQuestions: row.topicQuestions || {}
     }));
   } catch (error) {
     console.error('Failed to fetch sessions:', error);
@@ -42,15 +47,17 @@ export async function getSessions(): Promise<StudySession[]> {
 export async function saveSession(session: StudySession) {
   try {
     await sql`
-      INSERT INTO sessions (id, date, section, sub_topics, time_spent, questions_done, concept_mastered)
-      VALUES (${session.id}, ${session.date}, ${session.topic}, ${session.subTopics}, ${session.timeSpent}, ${session.questionsDone}, ${session.conceptMastered})
+      INSERT INTO sessions (id, date, section, sub_topics, time_spent, questions_done, concept_mastered, is_practice, topic_questions)
+      VALUES (${session.id}, ${session.date}, ${session.topic}, ${session.subTopics}, ${session.timeSpent}, ${session.questionsDone}, ${session.conceptMastered}, ${session.isPractice}, ${session.topicQuestions || {}})
       ON CONFLICT (id) DO UPDATE SET
         date = EXCLUDED.date,
         section = EXCLUDED.section,
         sub_topics = EXCLUDED.sub_topics,
         time_spent = EXCLUDED.time_spent,
         questions_done = EXCLUDED.questions_done,
-        concept_mastered = EXCLUDED.concept_mastered
+        concept_mastered = EXCLUDED.concept_mastered,
+        is_practice = EXCLUDED.is_practice,
+        topic_questions = EXCLUDED.topic_questions
     `;
     revalidatePath('/');
   } catch (error) {
