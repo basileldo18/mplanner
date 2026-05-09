@@ -124,6 +124,12 @@ const MODERN_MATHS_PLAN = [
   { topic: 'Modern Maths Revision', name: 'Probability & Modern Maths Revision', days: 2, startDay: 18, startMonth: 6 }, // July 18-19
 ];
 
+const LR_PLAN = [
+  { topic: 'Important concepts in logical reasoning', name: 'LR Fundamentals', days: 3, startDay: 11, startMonth: 4 }, // May 11-13
+  { topic: 'Logical reasoning based on arrangement', name: 'Arrangements', days: 2, startDay: 14, startMonth: 4 }, // May 14-15
+  { topic: 'Logical Reasoning Revision', name: 'Revision (LR Concepts & Arrangements)', days: 2, startDay: 16, startMonth: 4 }, // May 16-17
+];
+
 export default function Dashboard() {
   const [mounted, setMounted] = useState(false);
   const [sessions, setSessions] = useState<StudySession[]>([]);
@@ -510,16 +516,28 @@ export default function Dashboard() {
       });
     }
 
+    // Check LR Plan if no Modern Maths match
+    if (!planItem) {
+      planItem = LR_PLAN.find(item => {
+        const start = new Date(today.getFullYear(), item.startMonth, item.startDay);
+        const end = addDays(start, item.days - 1);
+        return todayLocal >= start && todayLocal <= end;
+      });
+    }
+
     if (planItem) {
       const isAlgebra = ALGEBRA_PLAN.some(p => p.name === planItem?.name && p.startDay === planItem?.startDay);
       const isArithmetic = ARITHMETIC_PLAN.some(p => p.name === planItem?.name && p.startDay === planItem?.startDay);
       const isGeometry = GEOMETRY_PLAN.some(p => p.name === planItem?.name && p.startDay === planItem?.startDay);
+      const isLR = LR_PLAN.some(p => p.name === planItem?.name && p.startDay === planItem?.startDay);
       let task = `Targeted study for ${planItem.name}. Aim for Level 1 & 2 questions.`;
       
       if (planItem.name === 'Mid-way Revision (L1 & L2 Qs)') {
         task = "Intensive L1 & L2 revision for Polynomials, Indices & Surds, and Logarithms (May 11-15 topics). Solve Arun Sharma Level 1 & 2.";
       } else if (planItem.name === 'Revision (Inequalities & Sequences)') {
         task = "Focus on Arun Sharma Level 1 & 2 questions for Inequalities and Sequence & Series covered this week.";
+      } else if (planItem.name === 'Revision (LR Concepts & Arrangements)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for LR Fundamentals and Arrangement topics covered this week.";
       } else if (planItem.name === 'Revision (Functions, Graphs, Modulus)') {
         task = "Focus on Arun Sharma Level 1 & 2 questions for Functions, Graphs, and Modulus covered this week.";
       } else if (planItem.name === 'Revision (Mixtures & SI/CI)') {
@@ -543,8 +561,8 @@ export default function Dashboard() {
       return {
         topic: planItem.name,
         task,
-        section: 'quants',
-        category: isAlgebra ? 'Algebra Intensive Plan' : isArithmetic ? 'Arithmetic Intensive Plan' : isGeometry ? 'Geometry Intensive Plan' : 'Modern Maths Intensive Plan',
+        section: isLR ? 'dilr' : 'quants',
+        category: isLR ? 'LR Intensive Plan' : isAlgebra ? 'Algebra Intensive Plan' : isArithmetic ? 'Arithmetic Intensive Plan' : isGeometry ? 'Geometry Intensive Plan' : 'Modern Maths Intensive Plan',
         isWeeklyReview: false,
         actualTopic: planItem.topic
       };
@@ -1273,7 +1291,7 @@ export default function Dashboard() {
                               {cat.importance} Importance
                             </span>
                           </div>
-                          {item.id === 'quants' && (
+                          {(item.id === 'quants' || (item.id === 'dilr' && cat.category === 'Logical Reasoning')) && (
                             <button 
                               onClick={() => setViewingTimeline(isViewingTimeline ? null : timelineId)}
                               style={{ 
@@ -1299,11 +1317,12 @@ export default function Dashboard() {
                                cat.category === 'Arithmetic' ? 'Arithmetic Intensive Roadmap (June 01-28)' :
                                cat.category === 'Geometry' ? 'Geometry Intensive Roadmap (June 29 - July 12)' :
                                cat.category === 'Modern Maths' ? 'Modern Maths Intensive Roadmap (July 13-19)' :
+                               cat.category === 'Logical Reasoning' ? 'LR Intensive Roadmap (May 11-17)' :
                                `${cat.category} Study Roadmap`}
                             </h5>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                              {cat.category === 'Algebra' || cat.category === 'Arithmetic' || cat.category === 'Geometry' || cat.category === 'Modern Maths' ? (
-                                (cat.category === 'Algebra' ? ALGEBRA_PLAN : cat.category === 'Arithmetic' ? ARITHMETIC_PLAN : cat.category === 'Geometry' ? GEOMETRY_PLAN : MODERN_MATHS_PLAN).map((plan, idx) => {
+                              {cat.category === 'Algebra' || cat.category === 'Arithmetic' || cat.category === 'Geometry' || cat.category === 'Modern Maths' || cat.category === 'Logical Reasoning' ? (
+                                (cat.category === 'Algebra' ? ALGEBRA_PLAN : cat.category === 'Arithmetic' ? ARITHMETIC_PLAN : cat.category === 'Geometry' ? GEOMETRY_PLAN : cat.category === 'Modern Maths' ? MODERN_MATHS_PLAN : LR_PLAN).map((plan, idx) => {
                                   const start = new Date(2026, plan.startMonth, plan.startDay);
                                   const end = addDays(start, plan.days - 1);
                                   const isToday = new Date() >= start && new Date() <= end;
