@@ -22,7 +22,8 @@ import {
   History,
   Search,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  Calendar
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -66,6 +67,50 @@ const CAT_SYLLABUS: Record<string, { category: string, topics: string[], importa
   ]
 };
 
+const ALGEBRA_PLAN = [
+  { topic: 'Indices & Surds', name: 'Exponents (Part 1)', days: 2, startDay: 9, startMonth: 4 }, // May 09-10
+  { topic: 'Polynomials', name: 'Polynomials', days: 1, startDay: 11, startMonth: 4 }, // May 11
+  { topic: 'Indices & Surds', name: 'Indices & Surds (Part 2)', days: 2, startDay: 12, startMonth: 4 }, // May 12-13
+  { topic: 'Logarithms', name: 'Logarithms', days: 2, startDay: 14, startMonth: 4 }, // May 14-15
+  { topic: 'Algebra Revision', name: 'Mid-way Revision (L1 & L2 Qs)', days: 2, startDay: 16, startMonth: 4 }, // May 16-17
+  { topic: 'Inequalities', name: 'Inequalities', days: 2, startDay: 18, startMonth: 4 }, // May 18-19
+  { topic: 'Sequence Series', name: 'Sequence & Series', days: 3, startDay: 20, startMonth: 4 }, // May 20-22
+  { topic: 'Algebra Revision', name: 'Revision (Inequalities & Sequences)', days: 2, startDay: 23, startMonth: 4 }, // May 23-24
+  { topic: 'Functions', name: 'Functions', days: 2, startDay: 25, startMonth: 4 }, // May 25-26
+  { topic: 'Graphs', name: 'Graphs', days: 2, startDay: 27, startMonth: 4 }, // May 27-28
+  { topic: 'Modulus', name: 'Modulus', days: 1, startDay: 29, startMonth: 4 }, // May 29
+  { topic: 'Algebra Revision', name: 'Revision (Functions, Graphs, Modulus)', days: 2, startDay: 30, startMonth: 4 }, // May 30-31
+];
+
+const ARITHMETIC_PLAN = [
+  { topic: 'Mixtures and Allegations', name: 'Mixtures & Allegations', days: 3, startDay: 1, startMonth: 5 }, // June 01-03
+  { topic: 'SI & CI', name: 'Simple & Compound Interest', days: 2, startDay: 4, startMonth: 5 }, // June 04-05
+  { topic: 'Arithmetic Revision', name: 'Revision (Mixtures & SI/CI)', days: 2, startDay: 6, startMonth: 5 }, // June 06-07
+  { topic: 'Time and Work', name: 'Time & Work', days: 4, startDay: 8, startMonth: 5 }, // June 08-11
+  { topic: 'Averages', name: 'Averages', days: 1, startDay: 12, startMonth: 5 }, // June 12
+  { topic: 'Arithmetic Revision', name: 'Revision (Time & Work, Averages)', days: 2, startDay: 13, startMonth: 5 }, // June 13-14
+  { topic: 'Pipes and Cisterns', name: 'Pipes & Cisterns', days: 3, startDay: 15, startMonth: 5 }, // June 15-17
+  { topic: 'Percentages', name: 'Percentages', days: 2, startDay: 18, startMonth: 5 }, // June 18-19
+  { topic: 'Arithmetic Revision', name: 'Revision (Pipes & Percentages)', days: 2, startDay: 20, startMonth: 5 }, // June 20-21
+  { topic: 'Time Speed Distance', name: 'Time, Speed & Distance', days: 3, startDay: 22, startMonth: 5 }, // June 22-24
+  { topic: 'Profit and Loss', name: 'Profit & Loss', days: 2, startDay: 25, startMonth: 5 }, // June 25-26
+  { topic: 'Arithmetic Revision', name: 'Revision (TSD & Profit Loss)', days: 2, startDay: 27, startMonth: 5 }, // June 27-28
+];
+
+const GEOMETRY_PLAN = [
+  { topic: 'Triangles', name: 'Triangles', days: 3, startDay: 29, startMonth: 5 }, // June 29 - July 01
+  { topic: 'Quadrilaterals', name: 'Quadrilaterals', days: 2, startDay: 2, startMonth: 6 }, // July 02-03
+  { topic: 'Geometry Revision', name: 'Revision (Triangles & Quads)', days: 2, startDay: 4, startMonth: 6 }, // July 04-05
+  { topic: 'Polygons & Circles', name: 'Polygons, Circles & Mensuration', days: 5, startDay: 6, startMonth: 6 }, // July 06-10
+  { topic: 'Geometry Revision', name: 'Revision (Polygons, Circles, Mensuration)', days: 2, startDay: 11, startMonth: 6 }, // July 11-12
+];
+
+const MODERN_MATHS_PLAN = [
+  { topic: 'Permutation and Combination', name: 'Permutation & Combination', days: 3, startDay: 13, startMonth: 6 }, // July 13-15
+  { topic: 'Set Theory', name: 'Set Theory', days: 2, startDay: 16, startMonth: 6 }, // July 16-17
+  { topic: 'Modern Maths Revision', name: 'Probability & Modern Maths Revision', days: 2, startDay: 18, startMonth: 6 }, // July 18-19
+];
+
 export default function Dashboard() {
   const [mounted, setMounted] = useState(false);
   const [sessions, setSessions] = useState<StudySession[]>([]);
@@ -90,6 +135,12 @@ export default function Dashboard() {
   const [conceptMastered, setConceptMastered] = useState(false);
   const [isPractice, setIsPractice] = useState(false);
   const [topicQuestions, setTopicQuestions] = useState<Record<string, string>>({});
+  const [selectedSyllabusTopic, setSelectedSyllabusTopic] = useState<{ sectionId: string, topicName: string } | null>(null);
+  const [l1Count, setL1Count] = useState('');
+  const [l2Count, setL2Count] = useState('');
+  const [l3Count, setL3Count] = useState('');
+  const [viewingTimeline, setViewingTimeline] = useState<string | null>(null);
+  const [previewDate, setPreviewDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
 
   useEffect(() => {
     setMounted(true);
@@ -178,38 +229,53 @@ export default function Dashboard() {
       alert("Failed to save session to cloud. Please check your connection.");
     }
   };
+  
+  const openTopicProgressModal = (sectionId: string, topicName: string) => {
+    const stats = getTopicStats()[topicName] || { l1: 0, l2: 0, l3: 0, mastered: false };
+    setSelectedSyllabusTopic({ sectionId, topicName });
+    setL1Count(stats.l1?.toString() || '');
+    setL2Count(stats.l2?.toString() || '');
+    setL3Count(stats.l3?.toString() || '');
+    setConceptMastered(stats.mastered || false);
+    setModalState('topic_details' as any);
+  };
+  
+  const handleSaveTopicProgress = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSyllabusTopic) return;
+    
+    const { sectionId, topicName } = selectedSyllabusTopic;
+    const l1 = Number(l1Count) || 0;
+    const l2 = Number(l2Count) || 0;
+    const l3 = Number(l3Count) || 0;
+    const total = l1 + l2 + l3;
+    
+    const progressSession: StudySession = {
+      id: `topic-progress-${topicName}-${Date.now()}`,
+      date: new Date().toISOString(),
+      topic: sectionId,
+      subTopics: [topicName],
+      timeSpent: 0,
+      questionsDone: total,
+      conceptMastered: conceptMastered,
+      isPractice: true,
+      topicQuestions: {
+        [topicName]: { l1, l2, l3, mastered: conceptMastered } as any
+      }
+    };
+
+    try {
+      await saveSession(progressSession);
+      setSessions(prev => [progressSession, ...prev]);
+      setModalState('closed');
+      setSelectedSyllabusTopic(null);
+    } catch (err) {
+      alert("Failed to save progress to cloud.");
+    }
+  };
 
   const toggleTopicCompletion = async (sectionId: string, topicName: string) => {
-    const isDone = sessions.some(s => s.topic === sectionId && (s.subTopic === topicName || (s.subTopics && s.subTopics.includes(topicName))));
-    
-    if (isDone) {
-      const sessionToDelete = sessions.find(s => s.topic === sectionId && (s.subTopic === topicName || (s.subTopics && s.subTopics.includes(topicName))));
-      if (sessionToDelete) {
-        try {
-          await deleteSession(sessionToDelete.id);
-          setSessions(prev => prev.filter(s => s.id !== sessionToDelete.id));
-        } catch (err) {
-          alert("Failed to remove topic status from cloud.");
-        }
-      }
-    } else {
-      const manualSession: StudySession = {
-        id: `manual-${Date.now()}`,
-        date: new Date().toISOString(),
-        topic: sectionId,
-        subTopics: [topicName],
-        timeSpent: 0,
-        questionsDone: 0,
-        conceptMastered: true,
-        isPractice: false
-      };
-      try {
-        await saveSession(manualSession);
-        setSessions(prev => [manualSession, ...prev]);
-      } catch (err) {
-        alert("Failed to mark topic as complete in cloud.");
-      }
-    }
+    openTopicProgressModal(sectionId, topicName);
   };
 
   const handleToggleSudoku = async () => {
@@ -284,8 +350,8 @@ export default function Dashboard() {
   const getPhaseInfo = () => {
     const today = new Date();
     const currentYear = today.getFullYear();
-    const phase1End = new Date(currentYear, 5, 25); // June 25
-    const phase2End = addDays(phase1End, 45); // ~Aug 09
+    const phase1End = new Date(currentYear, 6, 18); // July 18 (70 days from May 09)
+    const phase2End = addDays(phase1End, 45); // ~Sept 01
     const phase3End = new Date(currentYear, 10, 29); // Nov 29
     
     const phases = [
@@ -313,9 +379,9 @@ export default function Dashboard() {
 
   const phaseInfo = getPhaseInfo();
 
-  const getDaysToJune25 = () => {
+  const getDaysToPhase1End = () => {
     const today = new Date();
-    const target = new Date(today.getFullYear(), 5, 25); // June 25
+    const target = new Date(today.getFullYear(), 6, 18); // July 18
     if (today > target) return 0;
     return differenceInDays(target, today);
   };
@@ -333,11 +399,11 @@ export default function Dashboard() {
     
     const coveredTopics = coveredTopicsSet.size;
     const remainingTopics = totalTopics - coveredTopics;
-    const daysUntilJune25 = getDaysToJune25();
+    const daysUntilPhase1End = getDaysToPhase1End();
     
-    if (daysUntilJune25 <= 0) return null;
+    if (daysUntilPhase1End <= 0) return null;
     
-    const requiredTopicsPerDay = (remainingTopics / daysUntilJune25).toFixed(1);
+    const requiredTopicsPerDay = (remainingTopics / daysUntilPhase1End).toFixed(1);
     
     // Calculate current pace: topics covered in the last 7 days / 7
     const sevenDaysAgo = subDays(new Date(), 7);
@@ -369,7 +435,7 @@ export default function Dashboard() {
 
     return {
       remainingTopics,
-      daysUntilJune25,
+      daysUntilPhase1End,
       requiredTopicsPerDay,
       currentPace,
       isOnTrack,
@@ -377,16 +443,101 @@ export default function Dashboard() {
       todayHours,
       metTarget,
       advice: isOnTrack 
-        ? (metTarget ? "You're killing it! Pace and daily goals are perfect." : `On track for June 25, but try to hit your ${dailyTargets.total}h target today.`)
-        : `Speed up! You need ~${requiredTopicsPerDay} topics daily. Try to stick to your ${dailyTargets.total}h study plan.`
+        ? (metTarget ? "You're killing it! Pace and daily goals are perfect." : `On track for July 18, but try to hit your ${dailyTargets.total}h target today.`)
+        : `Speed up! You need ~${requiredTopicsPerDay} topics daily. Try to stick to your ${dailyTargets.total}h study plan.`,
+      planTask: (() => {
+        const now = new Date();
+        const planItem = ALGEBRA_PLAN.find(item => {
+          const start = new Date(now.getFullYear(), item.startMonth, item.startDay);
+          const end = addDays(start, item.days - 1);
+          return now >= start && now <= end;
+        });
+        return planItem;
+      })()
     };
   };
 
   const getRecommendation = () => {
-    const today = new Date();
-    const isWeekend = [0, 6].includes(today.getDay());
+    const today = previewDate ? new Date(previewDate) : new Date();
     
-    if (!isWeekend) return null;
+    const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    
+    // Check Algebra Plan first
+    let planItem = ALGEBRA_PLAN.find(item => {
+      const start = new Date(today.getFullYear(), item.startMonth, item.startDay);
+      const end = addDays(start, item.days - 1);
+      // Compare only the date parts (at midnight)
+      return todayLocal >= start && todayLocal <= end;
+    });
+
+    // Check Arithmetic Plan if no Algebra match
+    if (!planItem) {
+      planItem = ARITHMETIC_PLAN.find(item => {
+        const start = new Date(today.getFullYear(), item.startMonth, item.startDay);
+        const end = addDays(start, item.days - 1);
+        return todayLocal >= start && todayLocal <= end;
+      });
+    }
+
+    // Check Geometry Plan if no Arithmetic match
+    if (!planItem) {
+      planItem = GEOMETRY_PLAN.find(item => {
+        const start = new Date(today.getFullYear(), item.startMonth, item.startDay);
+        const end = addDays(start, item.days - 1);
+        return todayLocal >= start && todayLocal <= end;
+      });
+    }
+
+    // Check Modern Maths Plan if no Geometry match
+    if (!planItem) {
+      planItem = MODERN_MATHS_PLAN.find(item => {
+        const start = new Date(today.getFullYear(), item.startMonth, item.startDay);
+        const end = addDays(start, item.days - 1);
+        return todayLocal >= start && todayLocal <= end;
+      });
+    }
+
+    if (planItem) {
+      const isAlgebra = ALGEBRA_PLAN.some(p => p.name === planItem?.name && p.startDay === planItem?.startDay);
+      const isArithmetic = ARITHMETIC_PLAN.some(p => p.name === planItem?.name && p.startDay === planItem?.startDay);
+      const isGeometry = GEOMETRY_PLAN.some(p => p.name === planItem?.name && p.startDay === planItem?.startDay);
+      let task = `Targeted study for ${planItem.name}. Aim for Level 1 & 2 questions.`;
+      
+      if (planItem.name === 'Mid-way Revision (L1 & L2 Qs)') {
+        task = "Intensive L1 & L2 revision for Polynomials, Indices & Surds, and Logarithms (May 11-15 topics). Solve Arun Sharma Level 1 & 2.";
+      } else if (planItem.name === 'Revision (Inequalities & Sequences)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for Inequalities and Sequence & Series covered this week.";
+      } else if (planItem.name === 'Revision (Functions, Graphs, Modulus)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for Functions, Graphs, and Modulus covered this week.";
+      } else if (planItem.name === 'Revision (Mixtures & SI/CI)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for Mixtures & Allegations and SI/CI.";
+      } else if (planItem.name === 'Revision (Time & Work, Averages)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for Time & Work and Averages covered this week.";
+      } else if (planItem.name === 'Revision (Pipes & Percentages)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for Pipes & Cisterns and Percentages covered this week.";
+      } else if (planItem.name === 'Revision (TSD & Profit Loss)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for Time, Speed & Distance and Profit & Loss covered this week.";
+      } else if (planItem.name === 'Revision (Triangles & Quads)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for Triangles and Quadrilaterals covered this week.";
+      } else if (planItem.name === 'Revision (Polygons, Circles, Mensuration)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for Polygons, Circles, Mensuration, and Coordinate Geometry.";
+      } else if (planItem.name === 'Probability & Modern Maths Revision') {
+        task = "Cover Probability concepts and solve Arun Sharma Level 1 & 2 for P&C, Set Theory, and Probability.";
+      } else if (planItem.topic.includes('Revision')) {
+        task = `Comprehensive revision for ${planItem.topic.split(' ')[0]}. Solve mixed bags and previous CAT questions.`;
+      }
+
+      return {
+        topic: planItem.name,
+        task,
+        section: 'quants',
+        category: isAlgebra ? 'Algebra Intensive Plan' : isArithmetic ? 'Arithmetic Intensive Plan' : isGeometry ? 'Geometry Intensive Plan' : 'Modern Maths Intensive Plan',
+        isWeeklyReview: false,
+        actualTopic: planItem.topic
+      };
+    }
+
+    const isWeekend = [0, 6].includes(today.getDay());
 
     // Find topics studied this week (Monday to Friday)
     const mondayOfThisWeek = subDays(today, today.getDay() === 0 ? 6 : today.getDay() - 1);
@@ -501,18 +652,37 @@ export default function Dashboard() {
     Object.entries(CAT_SYLLABUS).forEach(([section, categories]) => {
       categories.forEach(cat => {
         cat.topics.forEach(topic => {
-          topicMap[topic] = { time: 0, qs: 0, mastered: false, section };
+          topicMap[topic] = { time: 0, qs: 0, mastered: false, section, l1: 0, l2: 0, l3: 0 } as any;
         });
       });
     });
+
+    const masteryLocked = new Set();
 
     sessions.forEach(s => {
       if (s.subTopics) {
         s.subTopics.forEach(topic => {
           if (topicMap[topic]) {
             topicMap[topic].time += s.timeSpent;
-            topicMap[topic].qs += s.topicQuestions?.[topic] || 0;
-            if (s.conceptMastered) topicMap[topic].mastered = true;
+            
+            const tq = s.topicQuestions?.[topic];
+            if (typeof tq === 'object' && tq !== null) {
+              topicMap[topic].l1 += (tq as any).l1 || 0;
+              topicMap[topic].l2 += (tq as any).l2 || 0;
+              topicMap[topic].l3 += (tq as any).l3 || 0;
+              topicMap[topic].qs += ((tq as any).l1 || 0) + ((tq as any).l2 || 0) + ((tq as any).l3 || 0);
+              
+              if (!masteryLocked.has(topic)) {
+                topicMap[topic].mastered = (tq as any).mastered || false;
+                masteryLocked.add(topic);
+              }
+            } else {
+              topicMap[topic].qs += Number(tq) || 0;
+              if (!masteryLocked.has(topic)) {
+                topicMap[topic].mastered = s.conceptMastered || false;
+                masteryLocked.add(topic);
+              }
+            }
           }
         });
       }
@@ -614,6 +784,7 @@ export default function Dashboard() {
               <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>
                 {modalState === 'setup' ? "Ignite Your Focus" : 
                  modalState === 'add_topic' ? "Expand Your Focus" : 
+                 modalState === 'topic_details' ? `Progress: ${selectedSyllabusTopic?.topicName}` :
                  "Victory Lap: Session Summary"}
               </h2>
               <button onClick={() => setModalState('closed')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={28} /></button>
@@ -734,6 +905,37 @@ export default function Dashboard() {
                 </button>
               </form>
             )}
+
+            {modalState === 'topic_details' && selectedSyllabusTopic && (
+              <form onSubmit={handleSaveTopicProgress} style={{ display: 'flex', flexDirection: 'column' }}>
+                <div style={{ padding: '1rem', background: 'var(--bg-main)', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>SECTION: {selectedSyllabusTopic.sectionId.toUpperCase()}</p>
+                  <p style={{ margin: '0.25rem 0 0', fontSize: '1.1rem', fontWeight: 800 }}>{selectedSyllabusTopic.topicName}</p>
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label>Level 1 Questions Done</label>
+                  <input className={styles.formInput} type="number" min="0" value={l1Count} onChange={e => setL1Count(e.target.value)} placeholder="0" />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Level 2 Questions Done</label>
+                  <input className={styles.formInput} type="number" min="0" value={l2Count} onChange={e => setL2Count(e.target.value)} placeholder="0" />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Level 3 Questions Done</label>
+                  <input className={styles.formInput} type="number" min="0" value={l3Count} onChange={e => setL3Count(e.target.value)} placeholder="0" />
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', margin: '1rem 0', padding: '1rem', background: 'rgba(16, 185, 129, 0.05)', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
+                  <input type="checkbox" id="topic-mastery" checked={conceptMastered} onChange={e => setConceptMastered(e.target.checked)} style={{ width: '22px', height: '22px', cursor: 'pointer' }} />
+                  <label htmlFor="topic-mastery" style={{ fontSize: '1rem', fontWeight: 600, cursor: 'pointer', color: '#059669' }}>Concept Covered & Mastered</label>
+                </div>
+
+                <button type="submit" className={styles.btnPrimary} style={{ marginTop: '1rem' }}>
+                  Save Progress
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}
@@ -794,8 +996,43 @@ export default function Dashboard() {
               {recommendation && (
                 <div className={styles.missionCard}>
                   <div className={styles.missionHeader}>
-                    <Flame size={20} color="var(--accent-danger)" />
-                    <span>DAILY MISSION</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <Flame size={20} color="var(--accent-danger)" />
+                      <span>DAILY MISSION</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <input 
+                        type="date" 
+                        value={previewDate} 
+                        onChange={(e) => setPreviewDate(e.target.value)}
+                        style={{ 
+                          padding: '0.25rem 0.5rem', 
+                          borderRadius: '6px', 
+                          border: '1px solid var(--border-color)',
+                          fontSize: '0.75rem',
+                          background: 'white',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      />
+                      {previewDate !== format(new Date(), 'yyyy-MM-dd') && (
+                        <button 
+                          onClick={() => setPreviewDate(format(new Date(), 'yyyy-MM-dd'))}
+                          style={{ 
+                            fontSize: '0.7rem', 
+                            padding: '0.25rem 0.5rem', 
+                            background: 'var(--accent-primary)', 
+                            color: 'white', 
+                            border: 'none', 
+                            borderRadius: '4px',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Today
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className={styles.missionContent}>
                     <h3>{recommendation.topic}</h3>
@@ -814,7 +1051,7 @@ export default function Dashboard() {
                   {!recommendation.isWeeklyReview ? (
                     <button className={styles.missionStartBtn} onClick={() => {
                       setActiveSection(recommendation.section);
-                      setActiveTopics([recommendation.topic]);
+                      setActiveTopics([recommendation.actualTopic || recommendation.topic]);
                       setModalState('setup');
                     }}>Start Studying This Topic</button>
                   ) : (
@@ -903,7 +1140,8 @@ export default function Dashboard() {
                       <th>Topic</th>
                       <th>Section</th>
                       <th>Study Time</th>
-                      <th>Practice Qs</th>
+                      <th>Level Breakdown</th>
+                      <th>Total Qs</th>
                       <th>Progress Status</th>
                     </tr>
                   </thead>
@@ -917,6 +1155,13 @@ export default function Dashboard() {
                           </span>
                         </td>
                         <td>{stats.time.toFixed(1)}h</td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '0.4rem', fontSize: '0.75rem', fontWeight: 600 }}>
+                            <span title="Level 1" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', padding: '2px 6px', borderRadius: '4px' }}>L1: {stats.l1}</span>
+                            <span title="Level 2" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#F59E0B', padding: '2px 6px', borderRadius: '4px' }}>L2: {stats.l2}</span>
+                            <span title="Level 3" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#EF4444', padding: '2px 6px', borderRadius: '4px' }}>L3: {stats.l3}</span>
+                          </div>
+                        </td>
                         <td style={{ fontWeight: 700, color: 'var(--accent-primary)' }}>{stats.qs} Qs</td>
                         <td>
                           {stats.mastered ? (
@@ -979,10 +1224,25 @@ export default function Dashboard() {
           <div className={styles.syllabusGridDetailed}>
             {syllabusPhase === 1 && generateSyllabusProgress().map((item, index) => (
               <section key={index} className={styles.syllabusSectionCard}>
-                <div className={styles.syllabusSectionHeader}><div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}><div className={styles.sectionColorDot} style={{ backgroundColor: item.color }} /><div><h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>{item.name}</h3><p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>{item.coveredTopics} of {item.totalTopicsCount} topics covered</p></div></div><div style={{ textAlign: 'right' }}><div style={{ fontSize: '1.5rem', fontWeight: 800, color: item.color }}>{item.progress}%</div></div></div>
+                <div className={styles.syllabusSectionHeader}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div className={styles.sectionColorDot} style={{ backgroundColor: item.color }} />
+                    <div>
+                      <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>{item.name}</h3>
+                      <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>{item.coveredTopics} of {item.totalTopicsCount} topics covered</p>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 800, color: item.color }}>{item.progress}%</div>
+                  </div>
+                </div>
+
                 <div className={styles.progressBarBg} style={{ height: '8px', margin: '1rem 0' }}><div className={`${styles.progressBarFill}`} style={{ width: `${item.progress}%`, backgroundColor: item.color }} /></div>
                 <div className={styles.syllabusDetailedTable}>
                   {CAT_SYLLABUS[item.id].map(cat => {
+                    const timelineId = `${item.id}_${cat.category}`;
+                    const isViewingTimeline = viewingTimeline === timelineId;
+                    
                     const filteredTopics = cat.topics.filter(topic => {
                       const matchesSearch = topic.toLowerCase().includes(syllabusSearch.toLowerCase());
                       const isDone = sessions.some(s => s.topic === item.id && s.subTopic === topic);
@@ -993,12 +1253,72 @@ export default function Dashboard() {
                     if (filteredTopics.length === 0 && (syllabusSearch || coverageFilter !== 'all')) return null;
                     return (
                       <div key={cat.category} className={styles.syllabusCatGroup}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-                          <h4 className={styles.syllabusCatTitle}>{cat.category}</h4>
-                          <span className={`${styles.importanceBadge} ${styles['importance' + cat.importance]}`}>
-                            {cat.importance} Importance
-                          </span>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <h4 className={styles.syllabusCatTitle}>{cat.category}</h4>
+                            <span className={`${styles.importanceBadge} ${styles['importance' + cat.importance]}`}>
+                              {cat.importance} Importance
+                            </span>
+                          </div>
+                          {item.id === 'quants' && (
+                            <button 
+                              onClick={() => setViewingTimeline(isViewingTimeline ? null : timelineId)}
+                              style={{ 
+                                display: 'flex', alignItems: 'center', gap: '0.4rem', 
+                                padding: '0.4rem 0.8rem', borderRadius: '6px', 
+                                background: isViewingTimeline ? 'var(--accent-primary)' : 'rgba(139, 92, 246, 0.05)', 
+                                color: isViewingTimeline ? 'white' : 'var(--accent-primary)',
+                                border: '1px solid rgba(139, 92, 246, 0.1)', fontWeight: 700, cursor: 'pointer',
+                                fontSize: '0.75rem', transition: 'all 0.2s'
+                              }}
+                            >
+                              <Calendar size={14} />
+                              {isViewingTimeline ? 'Hide Plan' : 'View Plan'}
+                            </button>
+                          )}
                         </div>
+
+                        {isViewingTimeline && (
+                          <div style={{ marginBottom: '1.5rem', padding: '1.25rem', background: 'rgba(139, 92, 246, 0.03)', borderRadius: '12px', border: '1px solid rgba(139, 92, 246, 0.1)', animation: 'fadeIn 0.3s' }}>
+                            <h5 style={{ margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', color: 'var(--accent-primary)' }}>
+                              <Clock size={16} />
+                              {cat.category === 'Algebra' ? 'Algebra Intensive Roadmap (May 09-31)' : 
+                               cat.category === 'Arithmetic' ? 'Arithmetic Intensive Roadmap (June 01-28)' :
+                               cat.category === 'Geometry' ? 'Geometry Intensive Roadmap (June 29 - July 12)' :
+                               cat.category === 'Modern Maths' ? 'Modern Maths Intensive Roadmap (July 13-19)' :
+                               `${cat.category} Study Roadmap`}
+                            </h5>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                              {cat.category === 'Algebra' || cat.category === 'Arithmetic' || cat.category === 'Geometry' || cat.category === 'Modern Maths' ? (
+                                (cat.category === 'Algebra' ? ALGEBRA_PLAN : cat.category === 'Arithmetic' ? ARITHMETIC_PLAN : cat.category === 'Geometry' ? GEOMETRY_PLAN : MODERN_MATHS_PLAN).map((plan, idx) => {
+                                  const start = new Date(2026, plan.startMonth, plan.startDay);
+                                  const end = addDays(start, plan.days - 1);
+                                  const isToday = new Date() >= start && new Date() <= end;
+                                  return (
+                                    <div key={idx} style={{ 
+                                      display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0.75rem', 
+                                      borderRadius: '6px', background: isToday ? 'rgba(139, 92, 246, 0.08)' : 'white',
+                                      border: isToday ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)'
+                                    }}>
+                                      <div style={{ minWidth: '100px', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                                        {format(start, 'MMM dd')} - {format(end, 'MMM dd')}
+                                      </div>
+                                      <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: isToday ? 'var(--accent-primary)' : '#CBD5E1' }} />
+                                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{plan.name}</span>
+                                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{plan.days}d</span>
+                                      </div>
+                                    </div>
+                                  );
+                                })
+                              ) : (
+                                <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', background: 'white', borderRadius: '8px', border: '1px dashed var(--border-color)' }}>
+                                  Detailed roadmap for {cat.category} is being finalized. Stay tuned!
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                         <div className={styles.syllabusTopicGrid}>
                           {filteredTopics.map(topic => {
                             const isDone = sessions.some(s => s.topic === item.id && (s.subTopic === topic || (s.subTopics && s.subTopics.includes(topic))));
@@ -1013,7 +1333,7 @@ export default function Dashboard() {
             ))}
 
             {syllabusPhase === 2 && SYLLABUS_TOPICS.map((item, index) => {
-              const phase1End = new Date(new Date().getFullYear(), 5, 25);
+              const phase1End = new Date(new Date().getFullYear(), 6, 18);
               const phase2Sessions = sessions.filter(s => s.topic === item.id && new Date(s.date) > phase1End);
               const totalQs = phase2Sessions.reduce((sum, s) => sum + s.questionsDone, 0);
               const targetQs = 1000;
@@ -1032,7 +1352,7 @@ export default function Dashboard() {
                 <div className={styles.syllabusSectionHeader}><div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}><div className={styles.sectionColorDot} style={{ backgroundColor: '#F59E0B' }} /><div><h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>Mock Test Marathon</h3><p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>30 Full-Length Mocks Tracker</p></div></div></div>
                 <div className={styles.mockGrid}>
                   {Array.from({ length: 30 }).map((_, i) => {
-                    const phase1End = new Date(new Date().getFullYear(), 5, 25);
+                    const phase1End = new Date(new Date().getFullYear(), 6, 18);
                     const phase2End = addDays(phase1End, 45);
                     const phase3Sessions = sessions.filter(s => new Date(s.date) > phase2End);
                     const isMockDone = i < phase3Sessions.length;
