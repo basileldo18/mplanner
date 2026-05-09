@@ -1034,72 +1034,68 @@ export default function Dashboard() {
 
           <div className={styles.dashboardGrid}>
             <div className={styles.dashboardMainCol}>
-              {recommendation && (
-                <div className={styles.missionCard}>
-                  <div className={styles.missionHeader}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <Flame size={20} color="var(--accent-danger)" />
-                      <span>DAILY MISSION</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div className={styles.mainMissionCard}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+                  <div>
+                    <h2 className={styles.sectionTitle}>Daily Mission</h2>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      <span className={styles.dateBadge}>
+                        <Calendar size={14} />
+                        {format(previewDate ? new Date(previewDate) : new Date(), 'MMMM dd, yyyy')}
+                      </span>
                       <input 
                         type="date" 
-                        value={previewDate} 
-                        onChange={(e) => setPreviewDate(e.target.value)}
+                        onChange={(e) => setPreviewDate(e.target.value)} 
                         style={{ 
-                          padding: '0.25rem 0.5rem', 
-                          borderRadius: '6px', 
-                          border: '1px solid var(--border-color)',
-                          fontSize: '0.75rem',
-                          background: 'white',
-                          fontWeight: 600,
-                          cursor: 'pointer'
+                          fontSize: '0.7rem', padding: '0.1rem 0.4rem', 
+                          borderRadius: '4px', border: '1px solid var(--border-color)',
+                          background: 'var(--bg-secondary)', color: 'var(--text-main)', cursor: 'pointer'
                         }}
                       />
-                      {previewDate !== format(new Date(), 'yyyy-MM-dd') && (
-                        <button 
-                          onClick={() => setPreviewDate(format(new Date(), 'yyyy-MM-dd'))}
-                          style={{ 
-                            fontSize: '0.7rem', 
-                            padding: '0.25rem 0.5rem', 
-                            background: 'var(--accent-primary)', 
-                            color: 'white', 
-                            border: 'none', 
-                            borderRadius: '4px',
-                            fontWeight: 700,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Today
-                        </button>
-                      )}
                     </div>
                   </div>
-                  <div className={styles.missionContent}>
-                    <h3>{recommendation.topic}</h3>
-                    <p>{recommendation.task}</p>
-                    <div className={styles.missionMeta}>
-                      {!recommendation.isWeeklyReview ? (
-                        <>
-                          <span className={styles.badgeQuants}>{recommendation.section.toUpperCase()}</span>
-                          <span className={styles.importanceBadge} style={{ background: 'rgba(0,0,0,0.05)', color: 'var(--text-main)' }}>{recommendation.category}</span>
-                        </>
-                      ) : (
-                        <span className={styles.badgeVerbal}>WEEKLY SUMMARY</span>
-                      )}
-                    </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Target Velocity</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--accent-primary)' }}>{forecast.requiredTopicsPerDay} Topics / Day</div>
                   </div>
-                  {!recommendation.isWeeklyReview ? (
-                    <button className={styles.missionStartBtn} onClick={() => {
-                      setActiveSection(recommendation.section);
-                      setActiveTopics([recommendation.actualTopic || recommendation.topic]);
-                      setModalState('setup');
-                    }}>Start Studying This Topic</button>
-                  ) : (
-                    <button className={styles.missionStartBtn} onClick={() => setModalState('setup')}>Start Weekend Practice Session</button>
-                  )}
                 </div>
-              )}
+
+                {recommendations.length > 0 ? (
+                  recommendations.map((rec, idx) => (
+                    <div key={idx} style={{ 
+                      marginBottom: idx < recommendations.length - 1 ? '1.5rem' : 0,
+                      padding: '1.25rem',
+                      background: rec.section === 'quants' ? 'rgba(139, 92, 246, 0.03)' : rec.section === 'dilr' ? 'rgba(6, 182, 212, 0.03)' : 'rgba(16, 185, 129, 0.03)',
+                      borderRadius: '12px',
+                      border: `1px solid ${rec.section === 'quants' ? 'rgba(139, 92, 246, 0.1)' : rec.section === 'dilr' ? 'rgba(6, 182, 212, 0.1)' : 'rgba(16, 185, 129, 0.1)'}`
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <span style={{ 
+                          fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', 
+                          color: rec.section === 'quants' ? 'var(--accent-primary)' : rec.section === 'dilr' ? '#0891b2' : '#059669',
+                          background: rec.section === 'quants' ? 'rgba(139, 92, 246, 0.1)' : rec.section === 'dilr' ? 'rgba(6, 182, 212, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                          padding: '0.25rem 0.6rem', borderRadius: '4px'
+                        }}>
+                          {rec.category}
+                        </span>
+                        {rec.isWeeklyReview && <span className={styles.missionPulse} style={{ background: '#10B981' }}>Special</span>}
+                      </div>
+                      <h3 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '0.75rem', color: 'var(--text-main)' }}>{rec.topic}</h3>
+                      <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, fontSize: '0.95rem', marginBottom: '1.25rem' }}>{rec.task}</p>
+                      <div style={{ display: 'flex', gap: '0.75rem' }}>
+                        <button onClick={() => { setActiveSection(rec.section === 'mixed' ? 'quants' : rec.section); setActiveTopics(rec.actualTopic ? [rec.actualTopic] : [rec.topic]); setModalState('setup'); }} className={styles.primaryBtn} style={{ padding: '0.75rem 1.5rem', borderRadius: '10px' }}>
+                          <Play size={18} /> Start Study
+                        </button>
+                        <button className={styles.secondaryBtn} onClick={() => alert("Check Syllabus tab for details.")}><Info size={18} /> View Concepts</button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '1rem' }}>
+                    No active mission for today. Enjoy your rest or pick a pending topic below!
+                  </div>
+                )}
+              </div>
 
               <section className={styles.section}><h2 className={styles.sectionTitle}><BarChart3 size={24} color="#8B5CF6" /> Study Consistency (Last 7 Days)</h2><div className={styles.chartContainer}><ResponsiveContainer width="100%" height="100%"><AreaChart data={generateChartData()} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}><defs><linearGradient id="colorHours" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.8}/><stop offset="95%" stopColor="#8B5CF6" stopOpacity={0}/></linearGradient></defs><CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} /><XAxis dataKey="name" stroke="#9CA3AF" tick={{fill: '#9CA3AF'}} tickLine={false} axisLine={false} /><YAxis stroke="#9CA3AF" tick={{fill: '#9CA3AF'}} tickLine={false} axisLine={false} /><Tooltip content={<CustomTooltip />} /><Area type="monotone" dataKey="hours" stroke="#8B5CF6" strokeWidth={3} fillOpacity={1} fill="url(#colorHours)" /></AreaChart></ResponsiveContainer></div></section>
               <section className={styles.section}><h2 className={styles.sectionTitle}><CheckCircle2 size={24} color="#10B981" /> 60-Day Activity Log</h2><div className={styles.consistencyGrid}>{generateConsistencyBoxes()}</div></section>
