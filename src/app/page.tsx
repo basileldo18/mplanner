@@ -1272,47 +1272,62 @@ export default function Dashboard() {
 
       {activeTab === 'syllabus' && (
         <div className={styles.syllabusView}>
+          <div className={styles.phaseTabs}>
+            {[1, 2, 3].map(p => (
+              <button key={p} className={`${styles.phaseTab} ${syllabusPhase === p ? styles.phaseTabActive : ''}`} onClick={() => setSyllabusPhase(p as 1|2|3)}>
+                Phase {p}: {p === 1 ? 'Syllabus' : p === 2 ? 'Practice' : 'Mocks'}
+              </button>
+            ))}
+          </div>
+
           <div className={styles.masterTimelineCard}>
             <div className={styles.timelineHeader}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>Phase 1: Master Timeline</h2>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>Complete Preparation Roadmap</h2>
               <div className={styles.timelineLegend}>
-                <div className={styles.legendItem}><div className={`${styles.sectionColorDot}`} style={{ backgroundColor: 'var(--accent-primary)' }} /> Quants Track</div>
-                <div className={styles.legendItem}><div className={`${styles.sectionColorDot}`} style={{ backgroundColor: 'var(--accent-secondary)' }} /> DILR Track</div>
+                <div className={styles.legendItem}><div className={`${styles.sectionColorDot}`} style={{ backgroundColor: 'var(--accent-primary)' }} /> Phase 1</div>
+                <div className={styles.legendItem}><div className={`${styles.sectionColorDot}`} style={{ backgroundColor: 'var(--accent-secondary)' }} /> Phase 2</div>
+                <div className={styles.legendItem}><div className={`${styles.sectionColorDot}`} style={{ backgroundColor: 'var(--accent-tertiary)' }} /> Phase 3</div>
               </div>
             </div>
 
             <div className={styles.timelineTracks}>
-              {/* Quants Track */}
+              {/* Overall Phases */}
               <div className={styles.timelineTrackRow}>
-                <div className={styles.trackLabel}>QUANTS</div>
+                <div className={styles.trackLabel}>TIMELINE</div>
                 <div className={styles.trackCells}>
-                  <div className={styles.trackPhase} style={{ flex: 23, background: 'rgba(139, 92, 246, 0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
-                    <span>Algebra (May 09-31)</span>
+                  <div className={`${styles.trackPhase} ${syllabusPhase === 1 ? styles.trackPhaseActive : ''}`} style={{ flex: 72, background: 'rgba(139, 92, 246, 0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
+                    <span>P1: Syllabus (May 9 - July 19)</span>
                   </div>
-                  <div className={styles.trackPhase} style={{ flex: 28, background: 'rgba(139, 92, 246, 0.05)', color: 'var(--accent-primary)', border: '1px solid rgba(139, 92, 246, 0.1)' }}>
-                    <span>Arithmetic (June 01-28)</span>
+                  <div className={`${styles.trackPhase} ${syllabusPhase === 2 ? styles.trackPhaseActive : ''}`} style={{ flex: 45, background: 'rgba(6, 182, 212, 0.1)', color: 'var(--accent-secondary)', border: '1px solid rgba(6, 182, 212, 0.2)' }}>
+                    <span>P2: Practice (July 20 - Sep 3)</span>
                   </div>
-                  <div className={styles.trackPhase} style={{ flex: 14, background: 'rgba(139, 92, 246, 0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
-                    <span>Geometry (June 29 - July 12)</span>
-                  </div>
-                  <div className={styles.trackPhase} style={{ flex: 7, background: 'rgba(139, 92, 246, 0.05)', color: 'var(--accent-primary)', border: '1px solid rgba(139, 92, 246, 0.1)' }}>
-                    <span>Modern Maths (July 13-19)</span>
+                  <div className={`${styles.trackPhase} ${syllabusPhase === 3 ? styles.trackPhaseActive : ''}`} style={{ flex: 75, background: 'rgba(245, 158, 11, 0.1)', color: 'var(--accent-tertiary)', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                    <span>P3: Mocks (Sep 4 - Nov 22)</span>
                   </div>
                 </div>
               </div>
 
-              {/* DILR Track */}
-              <div className={styles.timelineTrackRow}>
-                <div className={styles.trackLabel}>DILR</div>
-                <div className={styles.trackCells}>
-                  <div className={styles.trackPhase} style={{ flex: 42, background: 'rgba(6, 182, 212, 0.1)', color: 'var(--accent-secondary)', border: '1px solid rgba(6, 182, 212, 0.2)' }}>
-                    <span>LR Intensive (May 11 - June 21)</span>
+              {/* Detailed Track for current Phase (Only if in Phase 1) */}
+              {syllabusPhase === 1 && (
+                <>
+                  <div className={styles.timelineTrackRow} style={{ marginTop: '0.5rem' }}>
+                    <div className={styles.trackLabel} style={{ fontSize: '0.6rem', opacity: 0.7 }}>QUANTS</div>
+                    <div className={styles.trackCells} style={{ height: '24px' }}>
+                      <div className={styles.trackPhase} style={{ flex: 23, background: 'rgba(139, 92, 246, 0.05)', fontSize: '0.6rem' }}>Algebra</div>
+                      <div className={styles.trackPhase} style={{ flex: 28, background: 'rgba(139, 92, 246, 0.03)', fontSize: '0.6rem' }}>Arithmetic</div>
+                      <div className={styles.trackPhase} style={{ flex: 14, background: 'rgba(139, 92, 246, 0.05)', fontSize: '0.6rem' }}>Geometry</div>
+                      <div className={styles.trackPhase} style={{ flex: 7, background: 'rgba(139, 92, 246, 0.03)', fontSize: '0.6rem' }}>Modern</div>
+                    </div>
                   </div>
-                  <div className={styles.trackPhase} style={{ flex: 30, background: 'rgba(6, 182, 212, 0.05)', color: 'var(--accent-secondary)', border: '1px solid rgba(6, 182, 212, 0.1)', opacity: 0.6 }}>
-                    <span>DI Intensive (June 22 - July 19)</span>
+                  <div className={styles.timelineTrackRow}>
+                    <div className={styles.trackLabel} style={{ fontSize: '0.6rem', opacity: 0.7 }}>DILR</div>
+                    <div className={styles.trackCells} style={{ height: '24px' }}>
+                      <div className={styles.trackPhase} style={{ flex: 42, background: 'rgba(6, 182, 212, 0.05)', fontSize: '0.6rem' }}>LR Intensive</div>
+                      <div className={styles.trackPhase} style={{ flex: 30, background: 'rgba(6, 182, 212, 0.03)', fontSize: '0.6rem' }}>DI Intensive</div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                </>
+              )}
             </div>
             
             <div className={styles.timelineProgressFooter}>
@@ -1324,14 +1339,6 @@ export default function Dashboard() {
                 <span className={styles.footerValue}>{Math.round((sessions.filter(s => s.conceptMastered).length / 68) * 100)}%</span>
               </div>
             </div>
-          </div>
-
-          <div className={styles.phaseTabs}>
-            {[1, 2, 3].map(p => (
-              <button key={p} className={`${styles.phaseTab} ${syllabusPhase === p ? styles.phaseTabActive : ''}`} onClick={() => setSyllabusPhase(p as 1|2|3)}>
-                Phase {p}: {p === 1 ? 'Syllabus' : p === 2 ? 'Practice' : 'Mocks'}
-              </button>
-            ))}
           </div>
 
           <div className={styles.syllabusSearchWrapper}>
