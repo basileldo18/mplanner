@@ -729,20 +729,31 @@ export default function Dashboard() {
   };
 
   const generateSyllabusProgress = () => {
-    return SYLLABUS_TOPICS.map(topic => {
-      const topicSessions = sessions.filter(s => s.topic === topic.id);
+    return SYLLABUS_TOPICS.map(sectionInfo => {
+      const topicSessions = sessions.filter(s => s.topic === sectionInfo.id);
       const timeSpent = topicSessions.reduce((sum, s) => sum + s.timeSpent, 0);
       const qsDone = topicSessions.reduce((sum, s) => sum + s.questionsDone, 0);
       
-      const coveredTopicsSet = new Set();
+      const allSyllabusTopics = new Set(CAT_SYLLABUS[sectionInfo.id].flatMap(cat => cat.topics));
+      const coveredTopicsSet = new Set<string>();
+      
       topicSessions.forEach(s => {
-        if (s.subTopic) coveredTopicsSet.add(s.subTopic);
-        if (s.subTopics) s.subTopics.forEach(t => coveredTopicsSet.add(t));
+        if (s.subTopic && allSyllabusTopics.has(s.subTopic)) {
+          coveredTopicsSet.add(s.subTopic);
+        }
+        if (s.subTopics) {
+          s.subTopics.forEach(t => {
+            if (allSyllabusTopics.has(t)) {
+              coveredTopicsSet.add(t);
+            }
+          });
+        }
       });
+      
       const coveredTopics = coveredTopicsSet.size;
-      const totalTopicsCount = CAT_SYLLABUS[topic.id].reduce((acc, cat) => acc + cat.topics.length, 0);
+      const totalTopicsCount = allSyllabusTopics.size;
       const progress = Math.min(100, Math.round((coveredTopics / totalTopicsCount) * 100)) || 0;
-      return { ...topic, progress, timeSpent, qsDone, coveredTopics, totalTopicsCount };
+      return { ...sectionInfo, progress, timeSpent, qsDone, coveredTopics, totalTopicsCount };
     });
   };
 
