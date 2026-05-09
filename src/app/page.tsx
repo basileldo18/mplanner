@@ -128,6 +128,9 @@ const LR_PLAN = [
   { topic: 'Important concepts in logical reasoning', name: 'LR Fundamentals', days: 3, startDay: 11, startMonth: 4 }, // May 11-13
   { topic: 'Logical reasoning based on arrangement', name: 'Arrangements', days: 2, startDay: 14, startMonth: 4 }, // May 14-15
   { topic: 'Logical Reasoning Revision', name: 'Revision (LR Concepts & Arrangements)', days: 2, startDay: 16, startMonth: 4 }, // May 16-17
+  { topic: 'Logical reasoning based ranking', name: 'Ranking Puzzles', days: 3, startDay: 18, startMonth: 4 }, // May 18-20
+  { topic: 'Team formation', name: 'Team Formation', days: 2, startDay: 21, startMonth: 4 }, // May 21-22
+  { topic: 'Logical Reasoning Revision', name: 'Revision (Ranking & Team Formation)', days: 2, startDay: 23, startMonth: 4 }, // May 23-24
 ];
 
 export default function Dashboard() {
@@ -538,6 +541,8 @@ export default function Dashboard() {
         task = "Focus on Arun Sharma Level 1 & 2 questions for Inequalities and Sequence & Series covered this week.";
       } else if (planItem.name === 'Revision (LR Concepts & Arrangements)') {
         task = "Focus on Arun Sharma Level 1 & 2 questions for LR Fundamentals and Arrangement topics covered this week.";
+      } else if (planItem.name === 'Revision (Ranking & Team Formation)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for Ranking and Team Formation topics covered this week.";
       } else if (planItem.name === 'Revision (Functions, Graphs, Modulus)') {
         task = "Focus on Arun Sharma Level 1 & 2 questions for Functions, Graphs, and Modulus covered this week.";
       } else if (planItem.name === 'Revision (Mixtures & SI/CI)') {
