@@ -493,160 +493,145 @@ export default function Dashboard() {
 
   const getRecommendation = () => {
     const today = previewDate ? new Date(previewDate) : new Date();
-    
     const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     
-    // Check Algebra Plan first
-    let planItem = ALGEBRA_PLAN.find(item => {
+    const missions: any[] = [];
+
+    // 1. Check Quant Plans (Algebra, Arithmetic, Geometry, Modern Maths)
+    let quantItem = ALGEBRA_PLAN.find(item => {
       const start = new Date(today.getFullYear(), item.startMonth, item.startDay);
       const end = addDays(start, item.days - 1);
-      // Compare only the date parts (at midnight)
       return todayLocal >= start && todayLocal <= end;
     });
 
-    // Check Arithmetic Plan if no Algebra match
-    if (!planItem) {
-      planItem = ARITHMETIC_PLAN.find(item => {
+    if (!quantItem) {
+      quantItem = ARITHMETIC_PLAN.find(item => {
         const start = new Date(today.getFullYear(), item.startMonth, item.startDay);
         const end = addDays(start, item.days - 1);
         return todayLocal >= start && todayLocal <= end;
       });
     }
 
-    // Check Geometry Plan if no Arithmetic match
-    if (!planItem) {
-      planItem = GEOMETRY_PLAN.find(item => {
+    if (!quantItem) {
+      quantItem = GEOMETRY_PLAN.find(item => {
         const start = new Date(today.getFullYear(), item.startMonth, item.startDay);
         const end = addDays(start, item.days - 1);
         return todayLocal >= start && todayLocal <= end;
       });
     }
 
-    // Check Modern Maths Plan if no Geometry match
-    if (!planItem) {
-      planItem = MODERN_MATHS_PLAN.find(item => {
+    if (!quantItem) {
+      quantItem = MODERN_MATHS_PLAN.find(item => {
         const start = new Date(today.getFullYear(), item.startMonth, item.startDay);
         const end = addDays(start, item.days - 1);
         return todayLocal >= start && todayLocal <= end;
       });
     }
 
-    // Check LR Plan if no Modern Maths match
-    if (!planItem) {
-      planItem = LR_PLAN.find(item => {
-        const start = new Date(today.getFullYear(), item.startMonth, item.startDay);
-        const end = addDays(start, item.days - 1);
-        return todayLocal >= start && todayLocal <= end;
-      });
-    }
-
-    if (planItem) {
-      const isAlgebra = ALGEBRA_PLAN.some(p => p.name === planItem?.name && p.startDay === planItem?.startDay);
-      const isArithmetic = ARITHMETIC_PLAN.some(p => p.name === planItem?.name && p.startDay === planItem?.startDay);
-      const isGeometry = GEOMETRY_PLAN.some(p => p.name === planItem?.name && p.startDay === planItem?.startDay);
-      const isLR = LR_PLAN.some(p => p.name === planItem?.name && p.startDay === planItem?.startDay);
-      let task = `Targeted study for ${planItem.name}. Aim for Level 1 & 2 questions.`;
+    if (quantItem) {
+      const isAlgebra = ALGEBRA_PLAN.some(p => p.name === quantItem?.name && p.startDay === quantItem?.startDay);
+      const isArithmetic = ARITHMETIC_PLAN.some(p => p.name === quantItem?.name && p.startDay === quantItem?.startDay);
+      const isGeometry = GEOMETRY_PLAN.some(p => p.name === quantItem?.name && p.startDay === quantItem?.startDay);
       
-      if (planItem.name === 'Mid-way Revision (L1 & L2 Qs)') {
-        task = "Intensive L1 & L2 revision for Polynomials, Indices & Surds, and Logarithms (May 11-15 topics). Solve Arun Sharma Level 1 & 2.";
-      } else if (planItem.name === 'Revision (Inequalities & Sequences)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Inequalities and Sequence & Series covered this week.";
-      } else if (planItem.name === 'Revision (LR Concepts & Arrangements)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for LR Fundamentals and Arrangement topics covered this week.";
-      } else if (planItem.name === 'Revision (Ranking & Team Formation)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Ranking and Team Formation topics covered this week.";
-      } else if (planItem.name === 'Revision (Quant Reasoning & Puzzles)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Quantitative Reasoning and Generic Puzzles covered this week.";
-      } else if (planItem.name === 'Revision (Networks & Venn)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Routes & Networks and Set Theory & Venn diagrams.";
-      } else if (planItem.name === 'Revision (Cubes & Games)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Cubes & Dices and Games & Tournaments.";
-      } else if (planItem.name === 'Revision (Scheduling & Crypt)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Scheduling Puzzles and Cryptarithmetic.";
-      } else if (planItem.name === 'Revision (Functions, Graphs, Modulus)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Functions, Graphs, and Modulus covered this week.";
-      } else if (planItem.name === 'Revision (Mixtures & SI/CI)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Mixtures & Allegations and SI/CI.";
-      } else if (planItem.name === 'Revision (Time & Work, Averages)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Time & Work and Averages covered this week.";
-      } else if (planItem.name === 'Revision (Pipes & Percentages)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Pipes & Cisterns and Percentages covered this week.";
-      } else if (planItem.name === 'Revision (TSD & Profit Loss)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Time, Speed & Distance and Profit & Loss covered this week.";
-      } else if (planItem.name === 'Revision (Triangles & Quads)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Triangles and Quadrilaterals covered this week.";
-      } else if (planItem.name === 'Revision (Polygons, Circles, Mensuration)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Polygons, Circles, Mensuration, and Coordinate Geometry.";
-      } else if (planItem.name === 'Probability & Modern Maths Revision') {
-        task = "Cover Probability concepts and solve Arun Sharma Level 1 & 2 for P&C, Set Theory, and Probability.";
-      } else if (planItem.topic.includes('Revision')) {
-        task = `Comprehensive revision for ${planItem.topic.split(' ')[0]}. Solve mixed bags and previous CAT questions.`;
-      }
+      let task = `Targeted study for ${quantItem.name}. Aim for Level 1 & 2 questions.`;
+      if (quantItem.name === 'Mid-way Revision (L1 & L2 Qs)') task = "Intensive L1 & L2 revision for Polynomials, Indices & Surds, and Logarithms. Solve Arun Sharma Level 1 & 2.";
+      else if (quantItem.name === 'Revision (Inequalities & Sequences)') task = "Focus on Arun Sharma Level 1 & 2 questions for Inequalities and Sequence & Series.";
+      else if (quantItem.name === 'Revision (Functions, Graphs, Modulus)') task = "Focus on Arun Sharma Level 1 & 2 questions for Functions, Graphs, and Modulus.";
+      else if (quantItem.name === 'Revision (Mixtures & SI/CI)') task = "Focus on Arun Sharma Level 1 & 2 questions for Mixtures & Allegations and SI/CI.";
+      else if (quantItem.name === 'Revision (Time & Work, Averages)') task = "Focus on Arun Sharma Level 1 & 2 questions for Time & Work and Averages.";
+      else if (quantItem.name === 'Revision (Pipes & Percentages)') task = "Focus on Arun Sharma Level 1 & 2 questions for Pipes & Cisterns and Percentages.";
+      else if (quantItem.name === 'Revision (TSD & Profit Loss)') task = "Focus on Arun Sharma Level 1 & 2 questions for Time, Speed & Distance and Profit & Loss.";
+      else if (quantItem.name === 'Revision (Triangles & Quads)') task = "Focus on Arun Sharma Level 1 & 2 questions for Triangles and Quadrilaterals.";
+      else if (quantItem.name === 'Revision (Polygons, Circles, Mensuration)') task = "Focus on Arun Sharma Level 1 & 2 questions for Polygons, Circles, Mensuration, and Coordinate Geometry.";
+      else if (quantItem.name === 'Probability & Modern Maths Revision') task = "Cover Probability concepts and solve Arun Sharma Level 1 & 2 for P&C, Set Theory, and Probability.";
 
-      return {
-        topic: planItem.name,
+      missions.push({
+        topic: quantItem.name,
         task,
-        section: isLR ? 'dilr' : 'quants',
-        category: isLR ? 'LR Intensive Plan' : isAlgebra ? 'Algebra Intensive Plan' : isArithmetic ? 'Arithmetic Intensive Plan' : isGeometry ? 'Geometry Intensive Plan' : 'Modern Maths Intensive Plan',
+        section: 'quants',
+        category: isAlgebra ? 'Algebra Intensive Plan' : isArithmetic ? 'Arithmetic Intensive Plan' : isGeometry ? 'Geometry Intensive Plan' : 'Modern Maths Intensive Plan',
         isWeeklyReview: false,
-        actualTopic: planItem.topic
-      };
+        actualTopic: quantItem.topic
+      });
     }
 
-    const isWeekend = [0, 6].includes(today.getDay());
+    // 2. Check LR Plan
+    const lrItem = LR_PLAN.find(item => {
+      const start = new Date(today.getFullYear(), item.startMonth, item.startDay);
+      const end = addDays(start, item.days - 1);
+      return todayLocal >= start && todayLocal <= end;
+    });
 
-    // Find topics studied this week (Monday to Friday)
-    const mondayOfThisWeek = subDays(today, today.getDay() === 0 ? 6 : today.getDay() - 1);
-    const fridayOfThisWeek = addDays(mondayOfThisWeek, 4);
+    if (lrItem) {
+      let task = `Targeted study for ${lrItem.name}. Aim for Level 1 & 2 questions.`;
+      if (lrItem.name === 'Revision (LR Concepts & Arrangements)') task = "Focus on Arun Sharma Level 1 & 2 questions for LR Fundamentals and Arrangements.";
+      else if (lrItem.name === 'Revision (Ranking & Team Formation)') task = "Focus on Arun Sharma Level 1 & 2 questions for Ranking and Team Formation.";
+      else if (lrItem.name === 'Revision (Quant Reasoning & Puzzles)') task = "Focus on Arun Sharma Level 1 & 2 questions for Quantitative Reasoning and Generic Puzzles.";
+      else if (lrItem.name === 'Revision (Networks & Venn)') task = "Focus on Arun Sharma Level 1 & 2 questions for Routes & Networks and Set Theory & Venn diagrams.";
+      else if (lrItem.name === 'Revision (Cubes & Games)') task = "Focus on Arun Sharma Level 1 & 2 questions for Cubes & Dices and Games & Tournaments.";
+      else if (lrItem.name === 'Revision (Scheduling & Crypt)') task = "Focus on Arun Sharma Level 1 & 2 questions for Scheduling Puzzles and Cryptarithmetic.";
+
+      missions.push({
+        topic: lrItem.name,
+        task,
+        section: 'dilr',
+        category: 'LR Intensive Plan',
+        isWeeklyReview: false,
+        actualTopic: lrItem.topic
+      });
+    }
+
+    // 3. Fallback to weekly/generic if no intensive plans active
+    if (missions.length === 0) {
+      const mondayOfThisWeek = subDays(today, today.getDay() === 0 ? 6 : today.getDay() - 1);
+      const fridayOfThisWeek = addDays(mondayOfThisWeek, 4);
+      const weeklySessions = sessions.filter(s => {
+        const d = new Date(s.date);
+        return d >= mondayOfThisWeek && d <= fridayOfThisWeek && s.timeSpent > 0;
+      });
       
-    const weeklySessions = sessions.filter(s => {
-      const d = new Date(s.date);
-      return d >= mondayOfThisWeek && d <= fridayOfThisWeek && s.timeSpent > 0;
-    });
-    
-    const weeklyTopicsSet = new Set();
-    weeklySessions.forEach(s => {
-      if (s.subTopic) weeklyTopicsSet.add(s.subTopic);
-      if (s.subTopics) s.subTopics.forEach(t => weeklyTopicsSet.add(t));
-    });
-    const weeklyTopics = [...weeklyTopicsSet];
-    
-    if (weeklyTopics.length > 0) {
-      return {
-        topic: "Weekly Intensive Practice",
-        task: `Solve Arun Sharma Level 1 & 2 questions for: ${weeklyTopics.join(', ')}`,
-        section: 'mixed',
-        category: 'Weekend Special',
-        isWeeklyReview: true,
-        weeklyTopics
-      };
-    }
-
-    const allPending = [];
-    for (const section in CAT_SYLLABUS) {
-      for (const cat of CAT_SYLLABUS[section]) {
-        for (const topic of cat.topics) {
-          const isDone = sessions.some(s => s.topic === section && (s.subTopic === topic || (s.subTopics && s.subTopics.includes(topic))));
-          if (!isDone) {
-            allPending.push({ section, category: cat.category, topic, importance: cat.importance });
+      const weeklyTopicsSet = new Set();
+      weeklySessions.forEach(s => {
+        if (s.subTopic) weeklyTopicsSet.add(s.subTopic);
+        if (s.subTopics) s.subTopics.forEach(t => weeklyTopicsSet.add(t));
+      });
+      const weeklyTopics = [...weeklyTopicsSet];
+      
+      if (weeklyTopics.length > 0 && [0, 6].includes(today.getDay())) {
+        missions.push({
+          topic: "Weekly Intensive Practice",
+          task: `Solve Arun Sharma Level 1 & 2 questions for: ${weeklyTopics.join(', ')}`,
+          section: 'mixed',
+          category: 'Weekend Special',
+          isWeeklyReview: true,
+          weeklyTopics
+        });
+      } else {
+        const allPending = [];
+        for (const section in CAT_SYLLABUS) {
+          for (const cat of CAT_SYLLABUS[section]) {
+            for (const topic of cat.topics) {
+              const isDone = sessions.some(s => s.topic === section && (s.subTopic === topic || (s.subTopics && s.subTopics.includes(topic))));
+              if (!isDone) allPending.push({ section, category: cat.category, topic, importance: cat.importance });
+            }
           }
+        }
+        const high = allPending.filter(p => p.importance === 'High');
+        const picked = high.length > 0 ? high[0] : allPending[0];
+        if (picked) {
+          missions.push({
+            ...picked,
+            task: `Solve Arun Sharma Level 1 & 2 for ${picked.topic}.`,
+            isWeeklyReview: false
+          });
         }
       }
     }
-    
-    const high = allPending.filter(p => p.importance === 'High');
-    const picked = high.length > 0 ? high[0] : allPending[0];
-    
-    if (!picked) return null;
 
-    return {
-      ...picked,
-      task: `Solve Arun Sharma Level 1 & 2 for ${picked.topic}.`,
-      isWeeklyReview: false
-    };
+    return missions;
   };
 
-  const recommendation = getRecommendation();
+  const recommendations = getRecommendation();
   const forecast = getForecast();
 
   // Chart Generators
