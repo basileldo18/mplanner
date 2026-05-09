@@ -1432,7 +1432,7 @@ export default function Dashboard() {
                     
                     const filteredTopics = cat.topics.filter(topic => {
                       const matchesSearch = topic.toLowerCase().includes(syllabusSearch.toLowerCase());
-                      const isDone = sessions.some(s => s.topic === item.id && s.subTopic === topic);
+                      const isDone = sessions.some(s => s.topic === item.id && (s.subTopic === topic || (s.subTopics && s.subTopics.includes(topic))));
                       if (coverageFilter === 'covered') return matchesSearch && isDone;
                       if (coverageFilter === 'pending') return matchesSearch && !isDone;
                       return matchesSearch;
