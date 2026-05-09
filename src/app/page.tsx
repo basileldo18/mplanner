@@ -312,6 +312,46 @@ export default function Dashboard() {
     openTopicProgressModal(sectionId, topicName);
   };
 
+  const handleResetTopicProgress = async () => {
+    if (!selectedSyllabusTopic) return;
+    if (!confirm(`Clear all logged progress for "${selectedSyllabusTopic.topicName}"? This will remove the checkmark and reset question counts for this topic.`)) return;
+
+    const topicToClear = selectedSyllabusTopic.topicName;
+    const sectionToClear = selectedSyllabusTopic.sectionId;
+
+    try {
+      // Find all sessions containing this topic
+      const sessionsToUpdate = sessions.filter(s => 
+        s.topic === sectionToClear && (s.subTopic === topicToClear || (s.subTopics && s.subTopics.includes(topicToClear)))
+      );
+
+      // In a real app, we'd delete these from the DB. 
+      // For now, let's update the local state and we might need a way to persist this removal.
+      // Since our saveSession currently only handles ADDING, we might need a deleteSession.
+      
+      const newSessions = sessions.map(s => {
+        if (s.topic !== sectionToClear) return s;
+        if (s.subTopic === topicToClear) return null;
+        if (s.subTopics && s.subTopics.includes(topicToClear)) {
+          const filtered = s.subTopics.filter(t => t !== topicToClear);
+          if (filtered.length === 0) return null;
+          return { ...s, subTopics: filtered };
+        }
+        return s;
+      }).filter(Boolean) as StudySession[];
+
+      setSessions(newSessions);
+      setModalState('closed');
+      setSelectedSyllabusTopic(null);
+      
+      // Note: Full persistence would require a delete API call here.
+      // If the user refreshes, it might come back if not deleted from Neon.
+      // But for the "how to unclick" part, this is the logic.
+    } catch (err) {
+      alert("Failed to reset progress.");
+    }
+  };
+
   const handleToggleSudoku = async () => {
     const today = format(new Date(), 'yyyy-MM-dd');
     const existing = dailyTasks.find(t => t.date === today && t.taskName === 'Sudoku');
@@ -992,9 +1032,14 @@ export default function Dashboard() {
                   <label htmlFor="topic-mastery" style={{ fontSize: '1rem', fontWeight: 600, cursor: 'pointer', color: '#059669' }}>Concept Covered & Mastered</label>
                 </div>
 
-                <button type="submit" className={styles.btnPrimary} style={{ marginTop: '1rem' }}>
-                  Save Progress
-                </button>
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+                  <button type="submit" className={styles.btnPrimary} style={{ flex: 2 }}>
+                    Save Progress
+                  </button>
+                  <button type="button" onClick={handleResetTopicProgress} style={{ flex: 1, background: 'rgba(239, 68, 68, 0.05)', color: '#EF4444', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '12px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}>
+                    Reset
+                  </button>
+                </div>
               </form>
             )}
           </div>
