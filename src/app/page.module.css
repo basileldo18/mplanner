@@ -104,6 +104,153 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
+.masterTimelineCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 1.75rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+.timelineHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.timelineLegend {
+  display: flex;
+  gap: 1.25rem;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.timelineTracks {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.timelineTrackRow {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.trackLabel {
+  width: 60px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+}
+
+.trackCells {
+  flex: 1;
+  height: 32px;
+  display: flex;
+  gap: 4px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.trackPhase {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  transition: all 0.2s;
+  padding: 0 0.5rem;
+  white-space: nowrap;
+}
+
+.trackPhase:hover {
+  filter: brightness(0.95);
+  transform: scaleY(1.05);
+}
+
+.timelineProgressFooter {
+  border-top: 1px solid var(--border-color);
+  padding-top: 1.25rem;
+}
+
+.footerStat {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.footerLabel {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.overallProgressContainer {
+  flex: 1;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.overallProgressFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  border-radius: 3px;
+  transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.footerValue {
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: var(--accent-primary);
+}
+
+@media (max-width: 768px) {
+  .timelineHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .timelineTrackRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .trackLabel {
+    width: auto;
+  }
+  
+  .trackCells {
+    width: 100%;
+    height: auto;
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .trackPhase {
+    height: 32px;
+    width: 100% !important;
+    flex: none !important;
+  }
+}
+
 .card::before {
   content: '';
   position: absolute;

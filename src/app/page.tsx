@@ -1272,6 +1272,60 @@ export default function Dashboard() {
 
       {activeTab === 'syllabus' && (
         <div className={styles.syllabusView}>
+          <div className={styles.masterTimelineCard}>
+            <div className={styles.timelineHeader}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>Phase 1: Master Timeline</h2>
+              <div className={styles.timelineLegend}>
+                <div className={styles.legendItem}><div className={`${styles.sectionColorDot}`} style={{ backgroundColor: 'var(--accent-primary)' }} /> Quants Track</div>
+                <div className={styles.legendItem}><div className={`${styles.sectionColorDot}`} style={{ backgroundColor: 'var(--accent-secondary)' }} /> DILR Track</div>
+              </div>
+            </div>
+
+            <div className={styles.timelineTracks}>
+              {/* Quants Track */}
+              <div className={styles.timelineTrackRow}>
+                <div className={styles.trackLabel}>QUANTS</div>
+                <div className={styles.trackCells}>
+                  <div className={styles.trackPhase} style={{ flex: 23, background: 'rgba(139, 92, 246, 0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
+                    <span>Algebra (May 09-31)</span>
+                  </div>
+                  <div className={styles.trackPhase} style={{ flex: 28, background: 'rgba(139, 92, 246, 0.05)', color: 'var(--accent-primary)', border: '1px solid rgba(139, 92, 246, 0.1)' }}>
+                    <span>Arithmetic (June 01-28)</span>
+                  </div>
+                  <div className={styles.trackPhase} style={{ flex: 14, background: 'rgba(139, 92, 246, 0.1)', color: 'var(--accent-primary)', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
+                    <span>Geometry (June 29 - July 12)</span>
+                  </div>
+                  <div className={styles.trackPhase} style={{ flex: 7, background: 'rgba(139, 92, 246, 0.05)', color: 'var(--accent-primary)', border: '1px solid rgba(139, 92, 246, 0.1)' }}>
+                    <span>Modern Maths (July 13-19)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* DILR Track */}
+              <div className={styles.timelineTrackRow}>
+                <div className={styles.trackLabel}>DILR</div>
+                <div className={styles.trackCells}>
+                  <div className={styles.trackPhase} style={{ flex: 42, background: 'rgba(6, 182, 212, 0.1)', color: 'var(--accent-secondary)', border: '1px solid rgba(6, 182, 212, 0.2)' }}>
+                    <span>LR Intensive (May 11 - June 21)</span>
+                  </div>
+                  <div className={styles.trackPhase} style={{ flex: 30, background: 'rgba(6, 182, 212, 0.05)', color: 'var(--accent-secondary)', border: '1px solid rgba(6, 182, 212, 0.1)', opacity: 0.6 }}>
+                    <span>DI Intensive (June 22 - July 19)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className={styles.timelineProgressFooter}>
+              <div className={styles.footerStat}>
+                <span className={styles.footerLabel}>Overall Completion</span>
+                <div className={styles.overallProgressContainer}>
+                  <div className={styles.overallProgressFill} style={{ width: `${Math.round((sessions.filter(s => s.conceptMastered).length / 68) * 100)}%` }} />
+                </div>
+                <span className={styles.footerValue}>{Math.round((sessions.filter(s => s.conceptMastered).length / 68) * 100)}%</span>
+              </div>
+            </div>
+          </div>
+
           <div className={styles.phaseTabs}>
             {[1, 2, 3].map(p => (
               <button key={p} className={`${styles.phaseTab} ${syllabusPhase === p ? styles.phaseTabActive : ''}`} onClick={() => setSyllabusPhase(p as 1|2|3)}>
@@ -1356,7 +1410,7 @@ export default function Dashboard() {
                                cat.category === 'Arithmetic' ? 'Arithmetic Intensive Roadmap (June 01-28)' :
                                cat.category === 'Geometry' ? 'Geometry Intensive Roadmap (June 29 - July 12)' :
                                cat.category === 'Modern Maths' ? 'Modern Maths Intensive Roadmap (July 13-19)' :
-                               cat.category === 'Logical Reasoning' ? 'LR Intensive Roadmap (May 11-17)' :
+                               cat.category === 'Logical Reasoning' ? 'LR Intensive Roadmap (May 11 - June 21)' :
                                `${cat.category} Study Roadmap`}
                             </h5>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
