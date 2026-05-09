@@ -63,7 +63,20 @@ const CAT_SYLLABUS: Record<string, { category: string, topics: string[], importa
   ],
   dilr: [
     { category: 'Data Interpretation', importance: 'High', topics: ['Pie Charts', 'DI Tables', 'Line & Bar Graphs', 'Scatter Chart', 'Caselets', 'Quant-based DI', 'Table & Graphs'] },
-    { category: 'Logical Reasoning', importance: 'High', topics: ['Puzzles', 'Binary Logics', 'Venn Diagrams', 'Cubes', 'Linear Arrangement', 'Circular Arrangement', 'Ranking & Order', 'Routes & Network', 'Games & Tournaments', 'Selection & Distribution', 'Quant-based LR'] }
+    { category: 'Logical Reasoning', importance: 'High', topics: [
+      'Important concepts in logical reasoning',
+      'Logical reasoning based on arrangement',
+      'Logical reasoning based ranking',
+      'Team formation',
+      'Quantitative reasoning',
+      'Generic puzzles',
+      'Routes and network diagrams',
+      'Set theory and venn diagrams',
+      'Cubes and dices',
+      'Games and tournments',
+      'Puzzles on scheduling',
+      'Cryptarithemetic'
+    ] }
   ]
 };
 
