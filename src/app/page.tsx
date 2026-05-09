@@ -646,13 +646,13 @@ export default function Dashboard() {
   };
 
   const getTopicStats = () => {
-    const topicMap: Record<string, { time: number, qs: number, mastered: boolean, section: string }> = {};
+    const topicMap: Record<string, { time: number, qs: number, mastered: boolean, section: string, l1: number, l2: number, l3: number }> = {};
     
     // Initialize with all topics
     Object.entries(CAT_SYLLABUS).forEach(([section, categories]) => {
       categories.forEach(cat => {
         cat.topics.forEach(topic => {
-          topicMap[topic] = { time: 0, qs: 0, mastered: false, section, l1: 0, l2: 0, l3: 0 } as any;
+          topicMap[topic] = { time: 0, qs: 0, mastered: false, section, l1: 0, l2: 0, l3: 0 };
         });
       });
     });
