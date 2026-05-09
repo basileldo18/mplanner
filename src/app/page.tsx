@@ -495,64 +495,94 @@ export default function Dashboard() {
     const today = previewDate ? new Date(previewDate) : new Date();
     const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     
-    const missions: any[] = [];
+    const results: any[] = [];
 
-    // 1. Check Quant Plans (Algebra, Arithmetic, Geometry, Modern Maths)
-    let quantItem = ALGEBRA_PLAN.find(item => {
+    // --- Helper to build recommendation object ---
+    const buildRec = (planItem: any, isLR: boolean, isAlgebra: boolean, isArithmetic: boolean, isGeometry: boolean) => {
+      let task = `Targeted study for ${planItem.name}. Aim for Level 1 & 2 questions.`;
+      
+      if (planItem.name === 'Mid-way Revision (L1 & L2 Qs)') {
+        task = "Intensive L1 & L2 revision for Polynomials, Indices & Surds, and Logarithms (May 11-15 topics). Solve Arun Sharma Level 1 & 2.";
+      } else if (planItem.name === 'Revision (Inequalities & Sequences)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for Inequalities and Sequence & Series covered this week.";
+      } else if (planItem.name === 'Revision (LR Concepts & Arrangements)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for LR Fundamentals and Arrangement topics covered this week.";
+      } else if (planItem.name === 'Revision (Ranking & Team Formation)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for Ranking and Team Formation topics covered this week.";
+      } else if (planItem.name === 'Revision (Quant Reasoning & Puzzles)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for Quantitative Reasoning and Generic Puzzles covered this week.";
+      } else if (planItem.name === 'Revision (Networks & Venn)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for Routes & Networks and Set Theory & Venn diagrams.";
+      } else if (planItem.name === 'Revision (Cubes & Games)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for Cubes & Dices and Games & Tournaments.";
+      } else if (planItem.name === 'Revision (Scheduling & Crypt)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for Scheduling Puzzles and Cryptarithmetic.";
+      } else if (planItem.name === 'Revision (Functions, Graphs, Modulus)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for Functions, Graphs, and Modulus covered this week.";
+      } else if (planItem.name === 'Revision (Mixtures & SI/CI)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for Mixtures & Allegations and SI/CI.";
+      } else if (planItem.name === 'Revision (Time & Work, Averages)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for Time & Work and Averages covered this week.";
+      } else if (planItem.name === 'Revision (Pipes & Percentages)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for Pipes & Cisterns and Percentages covered this week.";
+      } else if (planItem.name === 'Revision (TSD & Profit Loss)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for Time, Speed & Distance and Profit & Loss covered this week.";
+      } else if (planItem.name === 'Revision (Triangles & Quads)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for Triangles and Quadrilaterals covered this week.";
+      } else if (planItem.name === 'Revision (Polygons, Circles, Mensuration)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for Polygons, Circles, Mensuration, and Coordinate Geometry.";
+      } else if (planItem.name === 'Probability & Modern Maths Revision') {
+        task = "Cover Probability concepts and solve Arun Sharma Level 1 & 2 for P&C, Set Theory, and Probability.";
+      } else if (planItem.topic.includes('Revision')) {
+        task = `Comprehensive revision for ${planItem.topic.split(' ')[0]}. Solve mixed bags and previous CAT questions.`;
+      }
+
+      return {
+        topic: planItem.name,
+        task,
+        section: isLR ? 'dilr' : 'quants',
+        category: isLR ? 'LR Intensive Plan' : isAlgebra ? 'Algebra Intensive Plan' : isArithmetic ? 'Arithmetic Intensive Plan' : isGeometry ? 'Geometry Intensive Plan' : 'Modern Maths Intensive Plan',
+        isWeeklyReview: false,
+        actualTopic: planItem.topic
+      };
+    };
+
+    // 1. Check Quants Plan
+    let quantsItem = ALGEBRA_PLAN.find(item => {
       const start = new Date(today.getFullYear(), item.startMonth, item.startDay);
       const end = addDays(start, item.days - 1);
       return todayLocal >= start && todayLocal <= end;
     });
 
-    if (!quantItem) {
-      quantItem = ARITHMETIC_PLAN.find(item => {
+    if (!quantsItem) {
+      quantsItem = ARITHMETIC_PLAN.find(item => {
         const start = new Date(today.getFullYear(), item.startMonth, item.startDay);
         const end = addDays(start, item.days - 1);
         return todayLocal >= start && todayLocal <= end;
       });
     }
 
-    if (!quantItem) {
-      quantItem = GEOMETRY_PLAN.find(item => {
+    if (!quantsItem) {
+      quantsItem = GEOMETRY_PLAN.find(item => {
         const start = new Date(today.getFullYear(), item.startMonth, item.startDay);
         const end = addDays(start, item.days - 1);
         return todayLocal >= start && todayLocal <= end;
       });
     }
 
-    if (!quantItem) {
-      quantItem = MODERN_MATHS_PLAN.find(item => {
+    if (!quantsItem) {
+      quantsItem = MODERN_MATHS_PLAN.find(item => {
         const start = new Date(today.getFullYear(), item.startMonth, item.startDay);
         const end = addDays(start, item.days - 1);
         return todayLocal >= start && todayLocal <= end;
       });
     }
 
-    if (quantItem) {
-      const isAlgebra = ALGEBRA_PLAN.some(p => p.name === quantItem?.name && p.startDay === quantItem?.startDay);
-      const isArithmetic = ARITHMETIC_PLAN.some(p => p.name === quantItem?.name && p.startDay === quantItem?.startDay);
-      const isGeometry = GEOMETRY_PLAN.some(p => p.name === quantItem?.name && p.startDay === quantItem?.startDay);
-      
-      let task = `Targeted study for ${quantItem.name}. Aim for Level 1 & 2 questions.`;
-      if (quantItem.name === 'Mid-way Revision (L1 & L2 Qs)') task = "Intensive L1 & L2 revision for Polynomials, Indices & Surds, and Logarithms. Solve Arun Sharma Level 1 & 2.";
-      else if (quantItem.name === 'Revision (Inequalities & Sequences)') task = "Focus on Arun Sharma Level 1 & 2 questions for Inequalities and Sequence & Series.";
-      else if (quantItem.name === 'Revision (Functions, Graphs, Modulus)') task = "Focus on Arun Sharma Level 1 & 2 questions for Functions, Graphs, and Modulus.";
-      else if (quantItem.name === 'Revision (Mixtures & SI/CI)') task = "Focus on Arun Sharma Level 1 & 2 questions for Mixtures & Allegations and SI/CI.";
-      else if (quantItem.name === 'Revision (Time & Work, Averages)') task = "Focus on Arun Sharma Level 1 & 2 questions for Time & Work and Averages.";
-      else if (quantItem.name === 'Revision (Pipes & Percentages)') task = "Focus on Arun Sharma Level 1 & 2 questions for Pipes & Cisterns and Percentages.";
-      else if (quantItem.name === 'Revision (TSD & Profit Loss)') task = "Focus on Arun Sharma Level 1 & 2 questions for Time, Speed & Distance and Profit & Loss.";
-      else if (quantItem.name === 'Revision (Triangles & Quads)') task = "Focus on Arun Sharma Level 1 & 2 questions for Triangles and Quadrilaterals.";
-      else if (quantItem.name === 'Revision (Polygons, Circles, Mensuration)') task = "Focus on Arun Sharma Level 1 & 2 questions for Polygons, Circles, Mensuration, and Coordinate Geometry.";
-      else if (quantItem.name === 'Probability & Modern Maths Revision') task = "Cover Probability concepts and solve Arun Sharma Level 1 & 2 for P&C, Set Theory, and Probability.";
-
-      missions.push({
-        topic: quantItem.name,
-        task,
-        section: 'quants',
-        category: isAlgebra ? 'Algebra Intensive Plan' : isArithmetic ? 'Arithmetic Intensive Plan' : isGeometry ? 'Geometry Intensive Plan' : 'Modern Maths Intensive Plan',
-        isWeeklyReview: false,
-        actualTopic: quantItem.topic
-      });
+    if (quantsItem) {
+      const isAlgebra = ALGEBRA_PLAN.some(p => p.name === quantsItem?.name && p.startDay === quantsItem?.startDay);
+      const isArithmetic = ARITHMETIC_PLAN.some(p => p.name === quantsItem?.name && p.startDay === quantsItem?.startDay);
+      const isGeometry = GEOMETRY_PLAN.some(p => p.name === quantsItem?.name && p.startDay === quantsItem?.startDay);
+      results.push(buildRec(quantsItem, false, isAlgebra, isArithmetic, isGeometry));
     }
 
     // 2. Check LR Plan
@@ -563,75 +593,65 @@ export default function Dashboard() {
     });
 
     if (lrItem) {
-      let task = `Targeted study for ${lrItem.name}. Aim for Level 1 & 2 questions.`;
-      if (lrItem.name === 'Revision (LR Concepts & Arrangements)') task = "Focus on Arun Sharma Level 1 & 2 questions for LR Fundamentals and Arrangements.";
-      else if (lrItem.name === 'Revision (Ranking & Team Formation)') task = "Focus on Arun Sharma Level 1 & 2 questions for Ranking and Team Formation.";
-      else if (lrItem.name === 'Revision (Quant Reasoning & Puzzles)') task = "Focus on Arun Sharma Level 1 & 2 questions for Quantitative Reasoning and Generic Puzzles.";
-      else if (lrItem.name === 'Revision (Networks & Venn)') task = "Focus on Arun Sharma Level 1 & 2 questions for Routes & Networks and Set Theory & Venn diagrams.";
-      else if (lrItem.name === 'Revision (Cubes & Games)') task = "Focus on Arun Sharma Level 1 & 2 questions for Cubes & Dices and Games & Tournaments.";
-      else if (lrItem.name === 'Revision (Scheduling & Crypt)') task = "Focus on Arun Sharma Level 1 & 2 questions for Scheduling Puzzles and Cryptarithmetic.";
-
-      missions.push({
-        topic: lrItem.name,
-        task,
-        section: 'dilr',
-        category: 'LR Intensive Plan',
-        isWeeklyReview: false,
-        actualTopic: lrItem.topic
-      });
+      results.push(buildRec(lrItem, true, false, false, false));
     }
 
-    // 3. Fallback to weekly/generic if no intensive plans active
-    if (missions.length === 0) {
-      const mondayOfThisWeek = subDays(today, today.getDay() === 0 ? 6 : today.getDay() - 1);
-      const fridayOfThisWeek = addDays(mondayOfThisWeek, 4);
-      const weeklySessions = sessions.filter(s => {
-        const d = new Date(s.date);
-        return d >= mondayOfThisWeek && d <= fridayOfThisWeek && s.timeSpent > 0;
-      });
+    if (results.length > 0) return results;
+
+    const isWeekend = [0, 6].includes(today.getDay());
+
+    // Find topics studied this week (Monday to Friday)
+    const mondayOfThisWeek = subDays(today, today.getDay() === 0 ? 6 : today.getDay() - 1);
+    const fridayOfThisWeek = addDays(mondayOfThisWeek, 4);
       
-      const weeklyTopicsSet = new Set();
-      weeklySessions.forEach(s => {
-        if (s.subTopic) weeklyTopicsSet.add(s.subTopic);
-        if (s.subTopics) s.subTopics.forEach(t => weeklyTopicsSet.add(t));
-      });
-      const weeklyTopics = [...weeklyTopicsSet];
-      
-      if (weeklyTopics.length > 0 && [0, 6].includes(today.getDay())) {
-        missions.push({
-          topic: "Weekly Intensive Practice",
-          task: `Solve Arun Sharma Level 1 & 2 questions for: ${weeklyTopics.join(', ')}`,
-          section: 'mixed',
-          category: 'Weekend Special',
-          isWeeklyReview: true,
-          weeklyTopics
-        });
-      } else {
-        const allPending = [];
-        for (const section in CAT_SYLLABUS) {
-          for (const cat of CAT_SYLLABUS[section]) {
-            for (const topic of cat.topics) {
-              const isDone = sessions.some(s => s.topic === section && (s.subTopic === topic || (s.subTopics && s.subTopics.includes(topic))));
-              if (!isDone) allPending.push({ section, category: cat.category, topic, importance: cat.importance });
-            }
+    const weeklySessions = sessions.filter(s => {
+      const d = new Date(s.date);
+      return d >= mondayOfThisWeek && d <= fridayOfThisWeek && s.timeSpent > 0;
+    });
+    
+    const weeklyTopicsSet = new Set();
+    weeklySessions.forEach(s => {
+      if (s.subTopic) weeklyTopicsSet.add(s.subTopic);
+      if (s.subTopics) s.subTopics.forEach(t => weeklyTopicsSet.add(t));
+    });
+    const weeklyTopics = [...weeklyTopicsSet];
+    
+    if (weeklyTopics.length > 0) {
+      return {
+        topic: "Weekly Intensive Practice",
+        task: `Solve Arun Sharma Level 1 & 2 questions for: ${weeklyTopics.join(', ')}`,
+        section: 'mixed',
+        category: 'Weekend Special',
+        isWeeklyReview: true,
+        weeklyTopics
+      };
+    }
+
+    const allPending = [];
+    for (const section in CAT_SYLLABUS) {
+      for (const cat of CAT_SYLLABUS[section]) {
+        for (const topic of cat.topics) {
+          const isDone = sessions.some(s => s.topic === section && (s.subTopic === topic || (s.subTopics && s.subTopics.includes(topic))));
+          if (!isDone) {
+            allPending.push({ section, category: cat.category, topic, importance: cat.importance });
           }
-        }
-        const high = allPending.filter(p => p.importance === 'High');
-        const picked = high.length > 0 ? high[0] : allPending[0];
-        if (picked) {
-          missions.push({
-            ...picked,
-            task: `Solve Arun Sharma Level 1 & 2 for ${picked.topic}.`,
-            isWeeklyReview: false
-          });
         }
       }
     }
+    
+    const high = allPending.filter(p => p.importance === 'High');
+    const picked = high.length > 0 ? high[0] : allPending[0];
+    
+    if (!picked) return null;
 
-    return missions;
+    return {
+      ...picked,
+      task: `Solve Arun Sharma Level 1 & 2 for ${picked.topic}.`,
+      isWeeklyReview: false
+    };
   };
 
-  const recommendations = getRecommendation();
+  const recommendation = getRecommendation();
   const forecast = getForecast();
 
   // Chart Generators
@@ -1034,68 +1054,81 @@ export default function Dashboard() {
 
           <div className={styles.dashboardGrid}>
             <div className={styles.dashboardMainCol}>
-              <div className={styles.mainMissionCard}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
-                  <div>
-                    <h2 className={styles.sectionTitle}>Daily Mission</h2>
-                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                      <span className={styles.dateBadge}>
-                        <Calendar size={14} />
-                        {format(previewDate ? new Date(previewDate) : new Date(), 'MMMM dd, yyyy')}
-                      </span>
+              {recommendation && (
+                <div className={styles.missionCard}>
+                  <div className={styles.missionHeader}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      <Flame size={20} color="var(--accent-danger)" />
+                      <span>DAILY MISSION</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       <input 
                         type="date" 
-                        onChange={(e) => setPreviewDate(e.target.value)} 
+                        value={previewDate} 
+                        onChange={(e) => setPreviewDate(e.target.value)}
                         style={{ 
-                          fontSize: '0.7rem', padding: '0.1rem 0.4rem', 
-                          borderRadius: '4px', border: '1px solid var(--border-color)',
-                          background: 'var(--bg-secondary)', color: 'var(--text-main)', cursor: 'pointer'
+                          padding: '0.25rem 0.5rem', 
+                          borderRadius: '6px', 
+                          border: '1px solid var(--border-color)',
+                          fontSize: '0.75rem',
+                          background: 'white',
+                          fontWeight: 600,
+                          cursor: 'pointer'
                         }}
                       />
+                      {previewDate !== format(new Date(), 'yyyy-MM-dd') && (
+                        <button 
+                          onClick={() => setPreviewDate(format(new Date(), 'yyyy-MM-dd'))}
+                          style={{ 
+                            fontSize: '0.7rem', 
+                            padding: '0.25rem 0.5rem', 
+                            background: 'var(--accent-primary)', 
+                            color: 'white', 
+                            border: 'none', 
+                            borderRadius: '4px',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Today
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Target Velocity</div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--accent-primary)' }}>{forecast.requiredTopicsPerDay} Topics / Day</div>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                    {(Array.isArray(recommendation) ? recommendation : [recommendation]).map((rec, idx) => (
+                      <div key={idx} className={styles.missionItem} style={{ borderBottom: idx === (Array.isArray(recommendation) ? recommendation.length - 1 : 0) ? 'none' : '1px solid var(--border-color)', paddingBottom: idx === (Array.isArray(recommendation) ? recommendation.length - 1 : 0) ? 0 : '1.5rem' }}>
+                        <div className={styles.missionContent}>
+                          <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>{rec.topic}</h3>
+                          <p style={{ fontSize: '0.85rem', marginBottom: '1rem' }}>{rec.task}</p>
+                          <div className={styles.missionMeta}>
+                            {!rec.isWeeklyReview ? (
+                              <>
+                                <span className={styles.badgeQuants} style={{ background: rec.section === 'dilr' ? 'rgba(6, 182, 212, 0.1)' : 'rgba(139, 92, 246, 0.1)', color: rec.section === 'dilr' ? 'var(--accent-secondary)' : 'var(--accent-primary)' }}>
+                                  {rec.section.toUpperCase()}
+                                </span>
+                                <span className={styles.importanceBadge} style={{ background: 'rgba(0,0,0,0.05)', color: 'var(--text-main)' }}>{rec.category}</span>
+                              </>
+                            ) : (
+                              <span className={styles.badgeVerbal}>WEEKLY SUMMARY</span>
+                            )}
+                          </div>
+                        </div>
+                        {!rec.isWeeklyReview ? (
+                          <button className={styles.missionStartBtn} onClick={() => {
+                            setActiveSection(rec.section);
+                            setActiveTopics([rec.actualTopic || rec.topic]);
+                            setModalState('setup');
+                          }}>Start Studying This Topic</button>
+                        ) : (
+                          <button className={styles.missionStartBtn} onClick={() => setModalState('setup')}>Start Weekend Practice Session</button>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
-
-                {recommendations.length > 0 ? (
-                  recommendations.map((rec, idx) => (
-                    <div key={idx} style={{ 
-                      marginBottom: idx < recommendations.length - 1 ? '1.5rem' : 0,
-                      padding: '1.25rem',
-                      background: rec.section === 'quants' ? 'rgba(139, 92, 246, 0.03)' : rec.section === 'dilr' ? 'rgba(6, 182, 212, 0.03)' : 'rgba(16, 185, 129, 0.03)',
-                      borderRadius: '12px',
-                      border: `1px solid ${rec.section === 'quants' ? 'rgba(139, 92, 246, 0.1)' : rec.section === 'dilr' ? 'rgba(6, 182, 212, 0.1)' : 'rgba(16, 185, 129, 0.1)'}`
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                        <span style={{ 
-                          fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', 
-                          color: rec.section === 'quants' ? 'var(--accent-primary)' : rec.section === 'dilr' ? '#0891b2' : '#059669',
-                          background: rec.section === 'quants' ? 'rgba(139, 92, 246, 0.1)' : rec.section === 'dilr' ? 'rgba(6, 182, 212, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                          padding: '0.25rem 0.6rem', borderRadius: '4px'
-                        }}>
-                          {rec.category}
-                        </span>
-                        {rec.isWeeklyReview && <span className={styles.missionPulse} style={{ background: '#10B981' }}>Special</span>}
-                      </div>
-                      <h3 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '0.75rem', color: 'var(--text-main)' }}>{rec.topic}</h3>
-                      <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, fontSize: '0.95rem', marginBottom: '1.25rem' }}>{rec.task}</p>
-                      <div style={{ display: 'flex', gap: '0.75rem' }}>
-                        <button onClick={() => { setActiveSection(rec.section === 'mixed' ? 'quants' : rec.section); setActiveTopics(rec.actualTopic ? [rec.actualTopic] : [rec.topic]); setModalState('setup'); }} className={styles.primaryBtn} style={{ padding: '0.75rem 1.5rem', borderRadius: '10px' }}>
-                          <Play size={18} /> Start Study
-                        </button>
-                        <button className={styles.secondaryBtn} onClick={() => alert("Check Syllabus tab for details.")}><Info size={18} /> View Concepts</button>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '1rem' }}>
-                    No active mission for today. Enjoy your rest or pick a pending topic below!
-                  </div>
-                )}
-              </div>
+              )}
 
               <section className={styles.section}><h2 className={styles.sectionTitle}><BarChart3 size={24} color="#8B5CF6" /> Study Consistency (Last 7 Days)</h2><div className={styles.chartContainer}><ResponsiveContainer width="100%" height="100%"><AreaChart data={generateChartData()} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}><defs><linearGradient id="colorHours" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.8}/><stop offset="95%" stopColor="#8B5CF6" stopOpacity={0}/></linearGradient></defs><CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} /><XAxis dataKey="name" stroke="#9CA3AF" tick={{fill: '#9CA3AF'}} tickLine={false} axisLine={false} /><YAxis stroke="#9CA3AF" tick={{fill: '#9CA3AF'}} tickLine={false} axisLine={false} /><Tooltip content={<CustomTooltip />} /><Area type="monotone" dataKey="hours" stroke="#8B5CF6" strokeWidth={3} fillOpacity={1} fill="url(#colorHours)" /></AreaChart></ResponsiveContainer></div></section>
               <section className={styles.section}><h2 className={styles.sectionTitle}><CheckCircle2 size={24} color="#10B981" /> 60-Day Activity Log</h2><div className={styles.consistencyGrid}>{generateConsistencyBoxes()}</div></section>
