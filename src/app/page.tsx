@@ -137,6 +137,9 @@ const LR_PLAN = [
   { topic: 'Routes and network diagrams', name: 'Routes & Networks', days: 3, startDay: 1, startMonth: 5 }, // June 01-03
   { topic: 'Set theory and venn diagrams', name: 'Set Theory & Venn', days: 2, startDay: 4, startMonth: 5 }, // June 04-05
   { topic: 'Logical Reasoning Revision', name: 'Revision (Networks & Venn)', days: 2, startDay: 6, startMonth: 5 }, // June 06-07
+  { topic: 'Cubes and dices', name: 'Cubes & Dices', days: 3, startDay: 8, startMonth: 5 }, // June 08-10
+  { topic: 'Games and tournments', name: 'Games & Tournaments', days: 2, startDay: 11, startMonth: 5 }, // June 11-12
+  { topic: 'Logical Reasoning Revision', name: 'Revision (Cubes & Games)', days: 2, startDay: 13, startMonth: 5 }, // June 13-14
 ];
 
 export default function Dashboard() {
@@ -553,6 +556,8 @@ export default function Dashboard() {
         task = "Focus on Arun Sharma Level 1 & 2 questions for Quantitative Reasoning and Generic Puzzles covered this week.";
       } else if (planItem.name === 'Revision (Networks & Venn)') {
         task = "Focus on Arun Sharma Level 1 & 2 questions for Routes & Networks and Set Theory & Venn diagrams.";
+      } else if (planItem.name === 'Revision (Cubes & Games)') {
+        task = "Focus on Arun Sharma Level 1 & 2 questions for Cubes & Dices and Games & Tournaments.";
       } else if (planItem.name === 'Revision (Functions, Graphs, Modulus)') {
         task = "Focus on Arun Sharma Level 1 & 2 questions for Functions, Graphs, and Modulus covered this week.";
       } else if (planItem.name === 'Revision (Mixtures & SI/CI)') {
