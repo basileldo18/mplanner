@@ -86,6 +86,40 @@ export async function clearAllSessions() {
   }
 }
 
+export async function resetTopicSessions(sectionId: string, topicName: string) {
+  try {
+    // This is a robust way to handle both JSONB and Text Array types in Postgres
+    // 1. Delete sessions that only have this topic
+    await sql`
+      DELETE FROM sessions 
+      WHERE section = ${sectionId} 
+      AND (
+        sub_topics::jsonb = ${JSON.stringify([topicName])}::jsonb
+        OR (sub_topics::text[] = ARRAY[${topicName}])
+      )
+    `;
+
+    // 2. Remove topic from multi-topic sessions
+    // Using a safe replace/filter logic for Postgres
+    await sql`
+      UPDATE sessions
+      SET sub_topics = (
+        SELECT jsonb_agg(elem)
+        FROM jsonb_array_elements(sub_topics::jsonb) AS elem
+        WHERE elem #>> '{}' != ${topicName}
+      )
+      WHERE section = ${sectionId} 
+      AND sub_topics::jsonb ? ${topicName}
+      AND jsonb_array_length(sub_topics::jsonb) > 1
+    `;
+
+    revalidatePath('/');
+  } catch (error) {
+    console.error('Failed to reset topic progress:', error);
+    throw new Error('Database reset failed');
+  }
+}
+
 export type DailyTask = {
   id: string;
   date: string;

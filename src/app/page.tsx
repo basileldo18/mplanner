@@ -41,7 +41,7 @@ import {
   Legend
 } from 'recharts';
 import { differenceInDays, format, subDays, isSameDay, addDays } from 'date-fns';
-import { getSessions, saveSession, deleteSession, clearAllSessions, getDailyTasks, toggleDailyTask, type StudySession, type DailyTask } from '@/lib/actions';
+import { getSessions, saveSession, deleteSession, clearAllSessions, resetTopicSessions, getDailyTasks, toggleDailyTask, type StudySession, type DailyTask } from '@/lib/actions';
 
 const SYLLABUS_TOPICS = [
   { id: 'quants', name: 'Quantitative Aptitude', totalQuestions: 2000, expectedHours: 150, colorClass: styles.fillQuants, color: '#8B5CF6' },
@@ -322,17 +322,8 @@ export default function Dashboard() {
 
     const topicToClear = selectedSyllabusTopic.topicName;
     const sectionToClear = selectedSyllabusTopic.sectionId;
-
     try {
-      // Find all sessions containing this topic
-      const sessionsToUpdate = sessions.filter(s => 
-        s.topic === sectionToClear && (s.subTopic === topicToClear || (s.subTopics && s.subTopics.includes(topicToClear)))
-      );
-
-      // In a real app, we'd delete these from the DB. 
-      // For now, let's update the local state and we might need a way to persist this removal.
-      // Since our saveSession currently only handles ADDING, we might need a deleteSession.
-      
+      // 1. Calculate new local state for instant UI update
       const newSessions = sessions.map(s => {
         if (s.topic !== sectionToClear) return s;
         if (s.subTopic === topicToClear) return null;
@@ -344,15 +335,15 @@ export default function Dashboard() {
         return s;
       }).filter(Boolean) as StudySession[];
 
+      // 2. Persistent removal from DB
+      await resetTopicSessions(sectionToClear, topicToClear);
+
       setSessions(newSessions);
       setModalState('closed');
       setSelectedSyllabusTopic(null);
-      
-      // Note: Full persistence would require a delete API call here.
-      // If the user refreshes, it might come back if not deleted from Neon.
-      // But for the "how to unclick" part, this is the logic.
     } catch (err) {
-      alert("Failed to reset progress.");
+      console.error("Reset error:", err);
+      alert("Failed to reset progress. Please check your connection.");
     }
   };
 
