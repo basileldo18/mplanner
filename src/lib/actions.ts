@@ -88,30 +88,44 @@ export async function clearAllSessions() {
 
 export async function resetTopicSessions(sectionId: string, topicName: string) {
   try {
-    // This is a robust way to handle both JSONB and Text Array types in Postgres
-    // 1. Delete sessions that only have this topic
-    await sql`
-      DELETE FROM sessions 
-      WHERE section = ${sectionId} 
-      AND (
-        sub_topics::jsonb = ${JSON.stringify([topicName])}::jsonb
-        OR (sub_topics::text[] = ARRAY[${topicName}])
-      )
+    // 1. Fetch all sessions for this section
+    const sessions = await sql`
+      SELECT id, sub_topics as "subTopics"
+      FROM sessions
+      WHERE section = ${sectionId}
     `;
 
-    // 2. Remove topic from multi-topic sessions
-    // Using a safe replace/filter logic for Postgres
-    await sql`
-      UPDATE sessions
-      SET sub_topics = (
-        SELECT jsonb_agg(elem)
-        FROM jsonb_array_elements(sub_topics::jsonb) AS elem
-        WHERE elem #>> '{}' != ${topicName}
-      )
-      WHERE section = ${sectionId} 
-      AND sub_topics::jsonb ? ${topicName}
-      AND jsonb_array_length(sub_topics::jsonb) > 1
-    `;
+    for (const session of sessions) {
+      // Handle potential variations in how sub_topics is returned (JSONB array or string)
+      let subTopics: string[] = [];
+      try {
+        if (Array.isArray(session.subTopics)) {
+          subTopics = session.subTopics;
+        } else if (typeof session.subTopics === 'string') {
+          subTopics = JSON.parse(session.subTopics);
+        }
+      } catch (e) {
+        console.error("Error parsing subTopics:", e);
+        continue;
+      }
+
+      if (subTopics.includes(topicName)) {
+        const filtered = subTopics.filter((t: string) => t !== topicName);
+        
+        if (filtered.length === 0) {
+          // If no topics left, delete the whole session
+          await sql`DELETE FROM sessions WHERE id = ${session.id}`;
+        } else {
+          // Update the session with filtered topics
+          // We use JSON.stringify to ensure it's stored correctly regardless of column type
+          await sql`
+            UPDATE sessions 
+            SET sub_topics = ${JSON.stringify(filtered)}
+            WHERE id = ${session.id}
+          `;
+        }
+      }
+    }
 
     revalidatePath('/');
   } catch (error) {
