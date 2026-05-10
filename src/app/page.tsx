@@ -145,6 +145,10 @@ const LR_PLAN = [
   { topic: 'Logical Reasoning Revision', name: 'Revision (Scheduling & Crypt)', days: 2, startDay: 20, startMonth: 5 }, // June 20-21
 ];
 
+const DI_PLAN = [
+  { topic: 'Pie Charts', name: 'Pie Charts (DILR)', days: 3, startDay: 22, startMonth: 5 }, // June 22-24
+];
+
 export default function Dashboard() {
   const [mounted, setMounted] = useState(false);
   const [sessions, setSessions] = useState<StudySession[]>([]);
@@ -1447,7 +1451,7 @@ export default function Dashboard() {
                               {cat.importance} Importance
                             </span>
                           </div>
-                          {(item.id === 'quants' || (item.id === 'dilr' && cat.category === 'Logical Reasoning')) && (
+                          {(item.id === 'quants' || (item.id === 'dilr' && (cat.category === 'Logical Reasoning' || cat.category === 'Data Interpretation'))) && (
                             <button 
                               onClick={() => setViewingTimeline(isViewingTimeline ? null : timelineId)}
                               style={{ 
@@ -1477,8 +1481,8 @@ export default function Dashboard() {
                                `${cat.category} Study Roadmap`}
                             </h5>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                              {cat.category === 'Algebra' || cat.category === 'Arithmetic' || cat.category === 'Geometry' || cat.category === 'Modern Maths' || cat.category === 'Logical Reasoning' ? (
-                                (cat.category === 'Algebra' ? ALGEBRA_PLAN : cat.category === 'Arithmetic' ? ARITHMETIC_PLAN : cat.category === 'Geometry' ? GEOMETRY_PLAN : cat.category === 'Modern Maths' ? MODERN_MATHS_PLAN : LR_PLAN).map((plan, idx) => {
+                              {cat.category === 'Algebra' || cat.category === 'Arithmetic' || cat.category === 'Geometry' || cat.category === 'Modern Maths' || cat.category === 'Logical Reasoning' || cat.category === 'Data Interpretation' ? (
+                                (cat.category === 'Algebra' ? ALGEBRA_PLAN : cat.category === 'Arithmetic' ? ARITHMETIC_PLAN : cat.category === 'Geometry' ? GEOMETRY_PLAN : cat.category === 'Modern Maths' ? MODERN_MATHS_PLAN : cat.category === 'Data Interpretation' ? DI_PLAN : LR_PLAN).map((plan, idx) => {
                                   const start = new Date(2026, plan.startMonth, plan.startDay);
                                   const end = addDays(start, plan.days - 1);
                                   const isToday = new Date() >= start && new Date() <= end;
