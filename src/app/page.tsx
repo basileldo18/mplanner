@@ -162,7 +162,7 @@ export default function Dashboard() {
   const [dailyTasks, setDailyTasks] = useState<DailyTask[]>([]);
 
   // Modal & Timer State
-  const [modalState, setModalState] = useState<'closed' | 'setup' | 'save' | 'add_topic'>('closed');
+  const [modalState, setModalState] = useState<'closed' | 'setup' | 'save' | 'add_topic' | 'topic_details'>('closed');
   const [activeSection, setActiveSection] = useState('quants');
   const [activeTopics, setActiveTopics] = useState<string[]>([]);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
