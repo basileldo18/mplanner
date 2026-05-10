@@ -1384,10 +1384,20 @@ export default function Dashboard() {
             <div className={styles.timelineProgressFooter}>
               <div className={styles.footerStat}>
                 <span className={styles.footerLabel}>Overall Completion</span>
-                <div className={styles.overallProgressContainer}>
-                  <div className={styles.overallProgressFill} style={{ width: `${Math.round((sessions.filter(s => s.conceptMastered).length / 68) * 100)}%` }} />
-                </div>
-                <span className={styles.footerValue}>{Math.round((sessions.filter(s => s.conceptMastered).length / 68) * 100)}%</span>
+                {(() => {
+                  const progressData = generateSyllabusProgress();
+                  const totalCovered = progressData.reduce((sum, item) => sum + item.coveredTopics, 0);
+                  const totalTopics = progressData.reduce((sum, item) => sum + item.totalTopicsCount, 0);
+                  const overallPercent = totalTopics > 0 ? Math.round((totalCovered / totalTopics) * 100) : 0;
+                  return (
+                    <>
+                      <div className={styles.overallProgressContainer}>
+                        <div className={styles.overallProgressFill} style={{ width: `${overallPercent}%` }} />
+                      </div>
+                      <span className={styles.footerValue}>{overallPercent}%</span>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
