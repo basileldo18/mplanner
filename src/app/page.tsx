@@ -80,6 +80,13 @@ const CAT_SYLLABUS: Record<string, { category: string, topics: string[], importa
   ]
 };
 
+// Helper to get all valid syllabus topics in a single set for efficient lookup
+const ALL_SYLLABUS_TOPICS_SET = new Set(
+  Object.values(CAT_SYLLABUS).flatMap(section => 
+    section.flatMap(cat => cat.topics)
+  )
+);
+
 const ALGEBRA_PLAN = [
   { topic: 'Indices & Surds', name: 'Exponents (Part 1)', days: 2, startDay: 9, startMonth: 4 }, // May 09-10
   { topic: 'Polynomials', name: 'Polynomials', days: 1, startDay: 11, startMonth: 4 }, // May 11
@@ -406,12 +413,22 @@ export default function Dashboard() {
   };
 
   const calculateSyllabusProgress = () => {
-    const totalTopics = Object.values(CAT_SYLLABUS).reduce((acc, catList) => 
-      acc + catList.reduce((sum, cat) => sum + cat.topics.length, 0), 0);
+    const totalTopics = ALL_SYLLABUS_TOPICS_SET.size;
+    if (totalTopics === 0) return 0;
+
     const uniqueTopicsCovered = new Set();
     sessions.forEach(s => {
-      if (s.subTopic) uniqueTopicsCovered.add(s.subTopic);
-      if (s.subTopics) s.subTopics.forEach(t => uniqueTopicsCovered.add(t));
+      // Only count topics that are actually part of our syllabus to avoid orphaned data issues
+      if (s.subTopic && ALL_SYLLABUS_TOPICS_SET.has(s.subTopic)) {
+        uniqueTopicsCovered.add(s.subTopic);
+      }
+      if (s.subTopics) {
+        s.subTopics.forEach(t => {
+          if (ALL_SYLLABUS_TOPICS_SET.has(t)) {
+            uniqueTopicsCovered.add(t);
+          }
+        });
+      }
     });
     return Math.min(100, Math.round((uniqueTopicsCovered.size / totalTopics) * 100));
   };
@@ -733,12 +750,12 @@ export default function Dashboard() {
       const coveredTopicsSet = new Set<string>();
       
       topicSessions.forEach(s => {
-        if (s.subTopic && allSyllabusTopics.has(s.subTopic)) {
+        if (s.subTopic && ALL_SYLLABUS_TOPICS_SET.has(s.subTopic) && allSyllabusTopics.has(s.subTopic)) {
           coveredTopicsSet.add(s.subTopic);
         }
         if (s.subTopics) {
           s.subTopics.forEach(t => {
-            if (allSyllabusTopics.has(t)) {
+            if (ALL_SYLLABUS_TOPICS_SET.has(t) && allSyllabusTopics.has(t)) {
               coveredTopicsSet.add(t);
             }
           });
