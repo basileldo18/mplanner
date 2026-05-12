@@ -56,6 +56,7 @@ const SYLLABUS_TOPICS = [
   { id: 'quants', name: 'Quantitative Aptitude', totalQuestions: 2000, expectedHours: 150, colorClass: styles.fillQuants, color: '#8B5CF6' },
   { id: 'verbal', name: 'Verbal Ability (VARC)', totalQuestions: 1500, expectedHours: 100, colorClass: styles.fillVerbal, color: '#10B981' },
   { id: 'dilr', name: 'Data Interpretation (DILR)', totalQuestions: 1500, expectedHours: 120, colorClass: styles.fillDILR, color: '#06B6D4' },
+  { id: 'speedmath', name: 'Speed Math & Shortcuts', totalQuestions: 500, expectedHours: 50, colorClass: styles.fillSpeedMath, color: '#F59E0B' },
 ];
 
 const CAT_SYLLABUS: Record<string, { category: string, topics: string[], importance: 'High' | 'Moderate' | 'Low' }[]> = {
@@ -86,6 +87,10 @@ const CAT_SYLLABUS: Record<string, { category: string, topics: string[], importa
       'Puzzles on scheduling',
       'Cryptarithemetic'
     ] }
+  ],
+  speedmath: [
+    { category: 'Calculation Tricks', importance: 'High', topics: ['Speed Math', 'Multiplication Tricks', 'Square & Cube Roots', 'Percentage Fractions', 'Addition & Subtraction'] },
+    { category: 'Formula Repository', importance: 'High', topics: ['Algebra Formulas', 'Geometry Theorems', 'Arithmetic Shortcuts'] }
   ]
 };
 
@@ -962,6 +967,10 @@ export default function Dashboard() {
 
   return (
     <main className={styles.container}>
+      {/* Hidden File Inputs */}
+      <input type="file" ref={shortcutInputRef} style={{ display: 'none' }} accept="image/*" onChange={handleShortcutUpload} />
+      <input type="file" ref={questionInputRef} style={{ display: 'none' }} accept="image/*" onChange={handleQuestionUpload} />
+
       <header className={styles.header}>
         <div className={styles.titleWrapper}>
           <h1>MBA Prep Hub</h1>
@@ -1037,7 +1046,7 @@ export default function Dashboard() {
                   <div>
                     <h2 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>Complete Trick Gallery</h2>
                     <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                      {selectedCategory === 'quants' ? 'Quantitative Aptitude' : selectedCategory === 'verbal' ? 'Verbal Ability' : 'DILR'} • 
+                      {selectedCategory === 'quants' ? 'Quantitative Aptitude' : selectedCategory === 'verbal' ? 'Verbal Ability' : selectedCategory === 'dilr' ? 'DILR' : 'Speed Math'} • 
                       {topicShortcuts.filter(s => getCategoryTopics(selectedCategory || '').includes(s.topicName)).length} items
                     </p>
                   </div>
@@ -1117,9 +1126,22 @@ export default function Dashboard() {
                                     {s.title}
                                   </div>
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'white', padding: '0.4rem 1rem', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-primary)', border: '1px solid var(--border-color)', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-                                  <BookOpen size={16} />
-                                  {s.topicName}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'white', padding: '0.4rem 1rem', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-primary)', border: '1px solid var(--border-color)', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                                    <BookOpen size={16} />
+                                    {s.topicName}
+                                  </div>
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteShortcut(s.id, e);
+                                    }}
+                                    style={{ background: '#EF4444', color: 'white', border: 'none', borderRadius: '10px', padding: '0.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s ease' }}
+                                    onMouseOver={(e) => e.currentTarget.style.background = '#DC2626'}
+                                    onMouseOut={(e) => e.currentTarget.style.background = '#EF4444'}
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
                                 </div>
                               </div>
                               <img 
@@ -1131,18 +1153,6 @@ export default function Dashboard() {
                                   setModalView('shortcut');
                                 }}
                               />
-                              <button 
-                                className={styles.deleteShortcut} 
-                                style={{ top: '1.5rem', right: '1.5rem', background: 'rgba(239, 68, 68, 0.9)', color: 'white', opacity: 0, transition: 'opacity 0.2s' }}
-                                onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
-                                onMouseOut={(e) => e.currentTarget.style.opacity = '0'}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteShortcut(s.id, e);
-                                }}
-                              >
-                                <Trash2 size={18} />
-                              </button>
                             </div>
                           ))}
                         </div>
@@ -1348,7 +1358,7 @@ export default function Dashboard() {
                   <div>
                     <h2 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>Complete Question Gallery</h2>
                     <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                      {selectedCategory === 'quants' ? 'Quantitative Aptitude' : selectedCategory === 'verbal' ? 'Verbal Ability' : 'DILR'} • 
+                      {selectedCategory === 'quants' ? 'Quantitative Aptitude' : selectedCategory === 'verbal' ? 'Verbal Ability' : selectedCategory === 'dilr' ? 'DILR' : 'Speed Math'} • 
                       {importantQuestions.filter(q => getCategoryTopics(selectedCategory || '').includes(q.topicName)).length} items
                     </p>
                   </div>
@@ -1429,9 +1439,22 @@ export default function Dashboard() {
                                     {q.title}
                                   </div>
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'white', padding: '0.4rem 1rem', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-secondary)', border: '1px solid var(--border-color)', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-                                  <FileText size={16} />
-                                  {q.topicName}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'white', padding: '0.4rem 1rem', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-secondary)', border: '1px solid var(--border-color)', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                                    <FileText size={16} />
+                                    {q.topicName}
+                                  </div>
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteQuestion(q.id, e);
+                                    }}
+                                    style={{ background: '#EF4444', color: 'white', border: 'none', borderRadius: '10px', padding: '0.5rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s ease' }}
+                                    onMouseOver={(e) => e.currentTarget.style.background = '#DC2626'}
+                                    onMouseOut={(e) => e.currentTarget.style.background = '#EF4444'}
+                                  >
+                                    <Trash2 size={18} />
+                                  </button>
                                 </div>
                               </div>
                               <img 
@@ -1443,18 +1466,6 @@ export default function Dashboard() {
                                   setModalView('shortcut');
                                 }}
                               />
-                              <button 
-                                className={styles.deleteShortcut} 
-                                style={{ top: '1.5rem', right: '1.5rem', background: 'rgba(239, 68, 68, 0.9)', color: 'white', opacity: 0, transition: 'opacity 0.2s' }}
-                                onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
-                                onMouseOut={(e) => e.currentTarget.style.opacity = '0'}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteQuestion(q.id, e);
-                                }}
-                              >
-                                <Trash2 size={18} />
-                              </button>
                             </div>
                           ))}
                         </div>
@@ -1666,7 +1677,6 @@ export default function Dashboard() {
                         >
                           <Plus size={18} />
                         </button>
-                        <input type="file" ref={shortcutInputRef} style={{ display: 'none' }} accept="image/*" onChange={handleShortcutUpload} />
                       </div>
                     </div>
 
@@ -1710,7 +1720,6 @@ export default function Dashboard() {
                         >
                           <Plus size={18} />
                         </button>
-                        <input type="file" ref={questionInputRef} style={{ display: 'none' }} accept="image/*" onChange={handleQuestionUpload} />
                       </div>
                     </div>
                   </div>
@@ -2439,8 +2448,22 @@ export default function Dashboard() {
                   <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
                     <div style={{ fontSize: '1.5rem', fontWeight: 800, color: item.color }}>{item.progress}%</div>
                     <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                      {item.id === 'quants' && (
+                      {(item.id === 'quants' || item.id === 'speedmath') && (
                         <>
+                          {item.id === 'speedmath' && (
+                            <button 
+                              onClick={() => {
+                                setSelectedSyllabusTopic({ topicName: 'Speed Math', sectionId: 'speedmath' });
+                                setTimeout(() => shortcutInputRef.current?.click(), 100);
+                              }}
+                              style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#F59E0B', border: 'none', padding: '0.4rem 0.8rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s ease' }}
+                              onMouseOver={(e) => e.currentTarget.style.background = 'rgba(245, 158, 11, 0.2)'}
+                              onMouseOut={(e) => e.currentTarget.style.background = 'rgba(245, 158, 11, 0.1)'}
+                            >
+                              <Plus size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                              Upload Trick
+                            </button>
+                          )}
                           <button 
                             onClick={() => {
                               setSelectedCategory(item.id);
