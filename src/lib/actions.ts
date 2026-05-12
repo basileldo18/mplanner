@@ -174,3 +174,157 @@ export async function toggleDailyTask(id: string, date: string, taskName: string
     throw new Error('Database update failed');
   }
 }
+
+export type ResourceNote = {
+  id: string;
+  name: string;
+  content: string; // base64
+  createdAt?: string;
+};
+
+export async function getResourceNotes(): Promise<ResourceNote[]> {
+  try {
+    const result = await sql`
+      SELECT id, name, content, created_at as "createdAt"
+      FROM resource_notes
+      ORDER BY created_at DESC
+    `;
+    return result.map(row => ({
+      id: row.id,
+      name: row.name,
+      content: row.content,
+      createdAt: row.createdAt
+    }));
+  } catch (error) {
+    console.error('Failed to fetch resource notes:', error);
+    return [];
+  }
+}
+
+export async function saveResourceNote(note: ResourceNote) {
+  try {
+    await sql`
+      INSERT INTO resource_notes (id, name, content)
+      VALUES (${note.id}, ${note.name}, ${note.content})
+      ON CONFLICT (id) DO UPDATE SET
+        name = EXCLUDED.name,
+        content = EXCLUDED.content
+    `;
+    revalidatePath('/');
+  } catch (error) {
+    console.error('Failed to save resource note:', error);
+    throw new Error('Database save failed');
+  }
+}
+
+export async function deleteResourceNote(id: string) {
+  try {
+    await sql`DELETE FROM resource_notes WHERE id = ${id}`;
+    revalidatePath('/');
+  } catch (error) {
+    console.error('Failed to delete resource note:', error);
+    throw new Error('Database delete failed');
+  }
+}
+
+export type TopicShortcut = {
+  id: string;
+  topicName: string;
+  title: string;
+  imageData: string; // base64
+  createdAt?: string;
+};
+
+export async function getTopicShortcuts(): Promise<TopicShortcut[]> {
+  try {
+    const result = await sql`
+      SELECT id, topic_name as "topicName", title, image_data as "imageData", created_at as "createdAt"
+      FROM topic_shortcuts
+      ORDER BY created_at DESC
+    `;
+    return result.map(row => ({
+      id: row.id,
+      topicName: row.topicName,
+      title: row.title || 'Untitled Trick',
+      imageData: row.imageData,
+      createdAt: row.createdAt
+    }));
+  } catch (error) {
+    console.error('Failed to fetch topic shortcuts:', error);
+    return [];
+  }
+}
+
+export async function saveTopicShortcut(shortcut: TopicShortcut) {
+  try {
+    await sql`
+      INSERT INTO topic_shortcuts (id, topic_name, title, image_data)
+      VALUES (${shortcut.id}, ${shortcut.topicName}, ${shortcut.title}, ${shortcut.imageData})
+    `;
+    revalidatePath('/');
+  } catch (error) {
+    console.error('Failed to save topic shortcut:', error);
+    throw new Error('Database save failed');
+  }
+}
+
+export async function deleteTopicShortcut(id: string) {
+  try {
+    await sql`DELETE FROM topic_shortcuts WHERE id = ${id}`;
+    revalidatePath('/');
+  } catch (error) {
+    console.error('Failed to delete topic shortcut:', error);
+    throw new Error('Database delete failed');
+  }
+}
+
+export type ImportantQuestion = {
+  id: string;
+  topicName: string;
+  title: string;
+  imageData: string; // base64
+  createdAt?: string;
+};
+
+export async function getImportantQuestions(): Promise<ImportantQuestion[]> {
+  try {
+    const result = await sql`
+      SELECT id, topic_name as "topicName", title, image_data as "imageData", created_at as "createdAt"
+      FROM important_questions
+      ORDER BY created_at DESC
+    `;
+    return result.map(row => ({
+      id: row.id,
+      topicName: row.topicName,
+      title: row.title || 'Untitled Question',
+      imageData: row.imageData,
+      createdAt: row.createdAt
+    }));
+  } catch (error) {
+    console.error('Failed to fetch important questions:', error);
+    return [];
+  }
+}
+
+export async function saveImportantQuestion(question: ImportantQuestion) {
+  try {
+    await sql`
+      INSERT INTO important_questions (id, topic_name, title, image_data)
+      VALUES (${question.id}, ${question.topicName}, ${question.title}, ${question.imageData})
+    `;
+    revalidatePath('/');
+  } catch (error) {
+    console.error('Failed to save important question:', error);
+    throw new Error('Database save failed');
+  }
+}
+
+export async function deleteImportantQuestion(id: string) {
+  try {
+    await sql`DELETE FROM important_questions WHERE id = ${id}`;
+    revalidatePath('/');
+  } catch (error) {
+    console.error('Failed to delete important question:', error);
+    throw new Error('Database delete failed');
+  }
+}

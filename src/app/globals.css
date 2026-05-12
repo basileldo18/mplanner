@@ -8,6 +8,7 @@
   --text-muted: #64748B;
   --accent-primary: #8B5CF6;
   --accent-secondary: #0EA5E9;
+  --accent-gradient: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
   --accent-tertiary: #F59E0B;
   --accent-success: #10B981;
   --accent-danger: #EF4444;

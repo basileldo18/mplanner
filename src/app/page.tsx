@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from './page.module.css';
 import { 
   BookOpen, 
@@ -23,7 +23,15 @@ import {
   Search,
   CheckCircle,
   AlertTriangle,
-  Calendar
+  Calendar,
+  FileUp,
+  FileText,
+  Trash2,
+  ExternalLink,
+  ImageOff,
+  Image,
+  List,
+  Check
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -41,7 +49,8 @@ import {
   Legend
 } from 'recharts';
 import { differenceInDays, format, subDays, isSameDay, addDays } from 'date-fns';
-import { getSessions, saveSession, deleteSession, clearAllSessions, resetTopicSessions, getDailyTasks, toggleDailyTask, type StudySession, type DailyTask } from '@/lib/actions';
+import { getSessions, saveSession, deleteSession, clearAllSessions, resetTopicSessions, getDailyTasks, toggleDailyTask, getResourceNotes, saveResourceNote, deleteResourceNote, getTopicShortcuts, saveTopicShortcut, deleteTopicShortcut, getImportantQuestions, saveImportantQuestion, deleteImportantQuestion, type StudySession, type DailyTask, type ResourceNote, type TopicShortcut, type ImportantQuestion } from '@/lib/actions';
+
 
 const SYLLABUS_TOPICS = [
   { id: 'quants', name: 'Quantitative Aptitude', totalQuestions: 2000, expectedHours: 150, colorClass: styles.fillQuants, color: '#8B5CF6' },
@@ -80,7 +89,6 @@ const CAT_SYLLABUS: Record<string, { category: string, topics: string[], importa
   ]
 };
 
-// Helper to get all valid syllabus topics in a single set for efficient lookup
 const ALL_SYLLABUS_TOPICS_SET = new Set(
   Object.values(CAT_SYLLABUS).flatMap(section => 
     section.flatMap(cat => cat.topics)
@@ -156,6 +164,14 @@ const DI_PLAN = [
   { topic: 'Pie Charts', name: 'Pie Charts (DILR)', days: 3, startDay: 22, startMonth: 5 }, // June 22-24
 ];
 
+const UPCOMING_EXAMS = [
+  { id: 'cat', name: 'CAT 2026', date: new Date(2026, 10, 29), color: '#8B5CF6', importance: 'Critical' },
+  { id: 'nmat', name: 'NMAT 2026', date: new Date(2026, 9, 10), color: '#10B981', importance: 'High' },
+  { id: 'snap', name: 'SNAP 2026', date: new Date(2026, 11, 6), color: '#06B6D4', importance: 'Moderate' },
+  { id: 'xat', name: 'XAT 2027', date: new Date(2027, 0, 3), color: '#06B6D4', importance: 'High' },
+  { id: 'mahcet', name: 'MAH CET 2027', date: new Date(2027, 2, 9), color: '#F59E0B', importance: 'Moderate' },
+];
+
 export default function Dashboard() {
   const [mounted, setMounted] = useState(false);
   const [sessions, setSessions] = useState<StudySession[]>([]);
@@ -167,15 +183,17 @@ export default function Dashboard() {
   const [syllabusSearch, setSyllabusSearch] = useState('');
   const [coverageFilter, setCoverageFilter] = useState<'all' | 'covered' | 'pending'>('all');
   const [dailyTasks, setDailyTasks] = useState<DailyTask[]>([]);
+  const [clickedExam, setClickedExam] = useState<string | null>(null);
+  const [resourceNotes, setResourceNotes] = useState<ResourceNote[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Modal & Timer State
   const [modalState, setModalState] = useState<'closed' | 'setup' | 'save' | 'add_topic' | 'topic_details'>('closed');
   const [activeSection, setActiveSection] = useState('quants');
   const [activeTopics, setActiveTopics] = useState<string[]>([]);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isTimerActive, setIsTimerActive] = useState(false);
 
-  // Form State after studying
   const [questionsDone, setQuestionsDone] = useState('');
   const [conceptMastered, setConceptMastered] = useState(false);
   const [isPractice, setIsPractice] = useState(false);
@@ -184,6 +202,15 @@ export default function Dashboard() {
   const [l1Count, setL1Count] = useState('');
   const [l2Count, setL2Count] = useState('');
   const [l3Count, setL3Count] = useState('');
+  const [topicShortcuts, setTopicShortcuts] = useState<TopicShortcut[]>([]);
+  const [importantQuestions, setImportantQuestions] = useState<ImportantQuestion[]>([]);
+  const shortcutInputRef = useRef<HTMLInputElement>(null);
+  const questionInputRef = useRef<HTMLInputElement>(null);
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
+  const [modalView, setModalView] = useState<'details' | 'shortcut' | 'gallery' | 'category_gallery' | 'questions_gallery' | 'category_questions_gallery'>('details');
+  const [selectedShortcut, setSelectedShortcut] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [viewingTimeline, setViewingTimeline] = useState<string | null>(null);
   const [previewDate, setPreviewDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
 
@@ -191,23 +218,173 @@ export default function Dashboard() {
     setMounted(true);
     const today = new Date();
     const currentYear = today.getFullYear();
-    let target = new Date(currentYear, 10, 29); // Nov 29
-    if (today > target) target = new Date(currentYear + 1, 10, 29);
-    setDaysLeft(differenceInDays(target, today));
+    
+    let catTarget = new Date(currentYear, 10, 29);
+    if (today > catTarget) catTarget = new Date(currentYear + 1, 10, 29);
+    setDaysLeft(differenceInDays(catTarget, today));
 
     const loadData = async () => {
       try {
-        const [sessionData, taskData] = await Promise.all([getSessions(), getDailyTasks()]);
+        const [sessionData, tasksData, notesData, shortcutsData, questionsData] = await Promise.all([
+          getSessions(),
+          getDailyTasks(),
+          getResourceNotes(),
+          getTopicShortcuts(),
+          getImportantQuestions()
+        ]);
         setSessions(sessionData);
-        setDailyTasks(taskData);
-      } catch (err) {
-        console.error("Failed to load data:", err);
+        setDailyTasks(tasksData);
+        setResourceNotes(notesData);
+        setTopicShortcuts(shortcutsData);
+        setImportantQuestions(questionsData);
+      } catch (error) {
+        console.error("Failed to load initial data", error);
       } finally {
         setLoading(false);
       }
     };
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (selectedSyllabusTopic) {
+      setModalView('details');
+      setSelectedShortcut(null);
+    }
+  }, [selectedSyllabusTopic]);
+
+  const getRecommendedTopic = (plans: any[][]) => {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    
+    for (const plan of plans) {
+      for (const task of plan) {
+        const taskStart = new Date(currentYear, task.startMonth, task.startDay);
+        const taskEnd = addDays(taskStart, task.days - 1);
+        
+        if (isSameDay(today, taskStart) || (today >= taskStart && today <= taskEnd)) {
+          return task;
+        }
+      }
+    }
+    return null;
+  };
+
+  const handleShortcutUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedSyllabusTopic) return;
+
+    const title = window.prompt("Give a title for this trick:", "");
+    if (title === null) return;
+
+    try {
+      setIsUploading(true);
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = reader.result as string;
+        const newShortcut: TopicShortcut = {
+          id: crypto.randomUUID(),
+          topicName: selectedSyllabusTopic.topicName,
+          title: title || 'Untitled Trick',
+          imageData: base64String
+        };
+        await saveTopicShortcut(newShortcut);
+        setTopicShortcuts(prev => [newShortcut, ...prev]);
+        setIsUploading(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("Failed to upload shortcut", error);
+      setIsUploading(false);
+    }
+  };
+
+  const handleQuestionUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedSyllabusTopic) return;
+
+    const title = window.prompt("Give a title for this important question:", "");
+    if (title === null) return;
+
+    try {
+      setIsUploading(true);
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = reader.result as string;
+        const newQuestion: ImportantQuestion = {
+          id: crypto.randomUUID(),
+          topicName: selectedSyllabusTopic.topicName,
+          title: title || 'Untitled Question',
+          imageData: base64String
+        };
+        await saveImportantQuestion(newQuestion);
+        setImportantQuestions(prev => [newQuestion, ...prev]);
+        setIsUploading(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("Failed to upload question", error);
+      setIsUploading(false);
+    }
+  };
+
+  const handleDeleteQuestion = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("Remove this important question?")) return;
+    try {
+      await deleteImportantQuestion(id);
+      setImportantQuestions(prev => prev.filter(q => q.id !== id));
+    } catch (error) {
+      console.error("Failed to delete question", error);
+    }
+  };
+  const handleDeleteShortcut = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("Remove this shortcut?")) return;
+    try {
+      await deleteTopicShortcut(id);
+      setTopicShortcuts(prev => prev.filter(s => s.id !== id));
+    } catch (error) {
+      console.error("Failed to delete shortcut", error);
+    }
+  };
+
+  const getCategoryTopics = (categoryId: string) => {
+    return CAT_SYLLABUS[categoryId]?.flatMap(c => c.topics) || [];
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || file.type !== 'application/pdf') return;
+    setIsUploading(true);
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64String = reader.result as string;
+      const newNote: ResourceNote = {
+        id: crypto.randomUUID(),
+        name: file.name,
+        content: base64String
+      };
+      try {
+        await saveResourceNote(newNote);
+        setResourceNotes(prev => [...prev, newNote]);
+      } catch (err) {
+        alert("Failed to upload file.");
+      } finally {
+        setIsUploading(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDeleteNote = async (id: string) => {
+    try {
+      await deleteResourceNote(id);
+      setResourceNotes(prev => prev.filter(n => n.id !== id));
+    } catch (err) {
+      alert("Failed to delete note.");
+    }
+  };
 
   useEffect(() => {
     const firstCategory = CAT_SYLLABUS[activeSection]?.[0];
@@ -242,6 +419,29 @@ export default function Dashboard() {
   const handleEndStudy = () => {
     setIsTimerActive(false);
     setModalState('save');
+  };
+
+  const handleToggleMission = async (missionName: string) => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const existing = dailyTasks.find(t => t.date === today && t.taskName === missionName);
+    const newState = !existing?.completed;
+    
+    try {
+      // Optimistic update
+      if (existing) {
+        setDailyTasks(prev => prev.map(t => (t.id === existing.id ? { ...t, completed: newState } : t)));
+      } else {
+        const newTask: DailyTask = { id: crypto.randomUUID(), date: today, taskName: missionName, completed: newState };
+        setDailyTasks(prev => [...prev, newTask]);
+      }
+      
+      await toggleDailyTask(existing?.id || crypto.randomUUID(), today, missionName, newState);
+    } catch (error) {
+      console.error("Failed to toggle mission", error);
+      // Revert on error
+      const tasks = await getDailyTasks();
+      setDailyTasks(tasks);
+    }
   };
 
   const handleSaveSession = async (e: React.FormEvent) => {
@@ -330,10 +530,8 @@ export default function Dashboard() {
     const topicToClear = selectedSyllabusTopic.topicName;
     const sectionToClear = selectedSyllabusTopic.sectionId;
     try {
-      // 1. Calculate new local state for instant UI update
       const newSessions = sessions.map(s => {
         if (s.topic !== sectionToClear) return s;
-        if (s.subTopic === topicToClear) return null;
         if (s.subTopics && s.subTopics.includes(topicToClear)) {
           const filtered = s.subTopics.filter(t => t !== topicToClear);
           if (filtered.length === 0) return null;
@@ -342,7 +540,6 @@ export default function Dashboard() {
         return s;
       }).filter(Boolean) as StudySession[];
 
-      // 2. Persistent removal from DB
       await resetTopicSessions(sectionToClear, topicToClear);
 
       setSessions(newSessions);
@@ -391,7 +588,6 @@ export default function Dashboard() {
     }
   };
 
-  // Metrics
   const totalStudyTime = sessions.reduce((sum, s) => sum + s.timeSpent, 0);
   const totalConcepts = sessions.filter(s => s.conceptMastered).length;
   const totalQuestions = sessions.reduce((sum, s) => sum + s.questionsDone, 0);
@@ -418,10 +614,6 @@ export default function Dashboard() {
 
     const uniqueTopicsCovered = new Set();
     sessions.forEach(s => {
-      // Only count topics that are actually part of our syllabus to avoid orphaned data issues
-      if (s.subTopic && ALL_SYLLABUS_TOPICS_SET.has(s.subTopic)) {
-        uniqueTopicsCovered.add(s.subTopic);
-      }
       if (s.subTopics) {
         s.subTopics.forEach(t => {
           if (ALL_SYLLABUS_TOPICS_SET.has(t)) {
@@ -433,17 +625,24 @@ export default function Dashboard() {
     return Math.min(100, Math.round((uniqueTopicsCovered.size / totalTopics) * 100));
   };
 
+  const calculateDailyHours = () => {
+    const today = new Date();
+    return sessions
+      .filter(s => isSameDay(new Date(s.date), today))
+      .reduce((sum, s) => sum + s.timeSpent, 0);
+  };
+
   const getPhaseInfo = () => {
     const today = new Date();
     const currentYear = today.getFullYear();
-    const phase1End = new Date(currentYear, 6, 18); // July 18 (70 days from May 09)
-    const phase2End = addDays(phase1End, 45); // ~Sept 01
-    const phase3End = new Date(currentYear, 10, 29); // Nov 29
+    const phase1End = new Date(currentYear, 6, 18);
+    const phase2End = addDays(phase1End, 45);
+    const phase3End = new Date(currentYear, 10, 29);
     
     const phases = [
-      { id: 1, name: "Phase 1: Syllabus", end: phase1End, icon: <BookOpen size={16} /> },
-      { id: 2, name: "Phase 2: Practice", end: phase2End, icon: <Target size={16} /> },
-      { id: 3, name: "Phase 3: Mocks", end: phase3End, icon: <Flame size={16} /> }
+      { id: 1, name: "Phase 1: Syllabus", end: phase1End, icon: <BookOpen size={16} />, importance: 'Foundation - Critical' },
+      { id: 2, name: "Phase 2: Practice", end: phase2End, icon: <Target size={16} />, importance: 'Speed & Accuracy - High' },
+      { id: 3, name: "Phase 3: Mocks", end: phase3End, icon: <Flame size={16} />, importance: 'Strategy - Essential' }
     ];
 
     if (today <= phase1End) {
@@ -467,7 +666,7 @@ export default function Dashboard() {
 
   const getDaysToPhase1End = () => {
     const today = new Date();
-    const target = new Date(today.getFullYear(), 6, 18); // July 18
+    const target = new Date(today.getFullYear(), 6, 18);
     if (today > target) return 0;
     return differenceInDays(target, today);
   };
@@ -479,7 +678,6 @@ export default function Dashboard() {
     
     const coveredTopicsSet = new Set();
     sessions.forEach(s => {
-      if (s.subTopic) coveredTopicsSet.add(s.subTopic);
       if (s.subTopics) s.subTopics.forEach(t => coveredTopicsSet.add(t));
     });
     
@@ -491,11 +689,9 @@ export default function Dashboard() {
     
     const requiredTopicsPerDay = (remainingTopics / daysUntilPhase1End).toFixed(1);
     
-    // Calculate current pace: topics covered in the last 7 days / 7
     const sevenDaysAgo = subDays(new Date(), 7);
     const recentTopicsSet = new Set();
     sessions.filter(s => new Date(s.date) >= sevenDaysAgo).forEach(s => {
-      if (s.subTopic) recentTopicsSet.add(s.subTopic);
       if (s.subTopics) s.subTopics.forEach(t => recentTopicsSet.add(t));
     });
     const recentTopics = recentTopicsSet.size;
@@ -503,7 +699,6 @@ export default function Dashboard() {
     
     const isOnTrack = Number(currentPace) >= Number(requiredTopicsPerDay);
     
-    // Daily Hour Targets
     const isWeekend = [0, 6].includes(today.getDay());
     const dailyTargets = isWeekend 
       ? { total: 8, quants: 3, dilr: 3, verbal: 2 } 
@@ -549,46 +744,9 @@ export default function Dashboard() {
     
     const results: any[] = [];
 
-    // --- Helper to build recommendation object ---
     const buildRec = (planItem: any, isLR: boolean, isAlgebra: boolean, isArithmetic: boolean, isGeometry: boolean) => {
       let task = `Targeted study for ${planItem.name}. Aim for Level 1 & 2 questions.`;
       
-      if (planItem.name === 'Mid-way Revision (L1 & L2 Qs)') {
-        task = "Intensive L1 & L2 revision for Polynomials, Indices & Surds, and Logarithms (May 11-15 topics). Solve Arun Sharma Level 1 & 2.";
-      } else if (planItem.name === 'Revision (Inequalities & Sequences)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Inequalities and Sequence & Series covered this week.";
-      } else if (planItem.name === 'Revision (LR Concepts & Arrangements)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for LR Fundamentals and Arrangement topics covered this week.";
-      } else if (planItem.name === 'Revision (Ranking & Team Formation)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Ranking and Team Formation topics covered this week.";
-      } else if (planItem.name === 'Revision (Quant Reasoning & Puzzles)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Quantitative Reasoning and Generic Puzzles covered this week.";
-      } else if (planItem.name === 'Revision (Networks & Venn)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Routes & Networks and Set Theory & Venn diagrams.";
-      } else if (planItem.name === 'Revision (Cubes & Games)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Cubes & Dices and Games & Tournaments.";
-      } else if (planItem.name === 'Revision (Scheduling & Crypt)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Scheduling Puzzles and Cryptarithmetic.";
-      } else if (planItem.name === 'Revision (Functions, Graphs, Modulus)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Functions, Graphs, and Modulus covered this week.";
-      } else if (planItem.name === 'Revision (Mixtures & SI/CI)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Mixtures & Allegations and SI/CI.";
-      } else if (planItem.name === 'Revision (Time & Work, Averages)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Time & Work and Averages covered this week.";
-      } else if (planItem.name === 'Revision (Pipes & Percentages)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Pipes & Cisterns and Percentages covered this week.";
-      } else if (planItem.name === 'Revision (TSD & Profit Loss)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Time, Speed & Distance and Profit & Loss covered this week.";
-      } else if (planItem.name === 'Revision (Triangles & Quads)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Triangles and Quadrilaterals covered this week.";
-      } else if (planItem.name === 'Revision (Polygons, Circles, Mensuration)') {
-        task = "Focus on Arun Sharma Level 1 & 2 questions for Polygons, Circles, Mensuration, and Coordinate Geometry.";
-      } else if (planItem.name === 'Probability & Modern Maths Revision') {
-        task = "Cover Probability concepts and solve Arun Sharma Level 1 & 2 for P&C, Set Theory, and Probability.";
-      } else if (planItem.topic.includes('Revision')) {
-        task = `Comprehensive revision for ${planItem.topic.split(' ')[0]}. Solve mixed bags and previous CAT questions.`;
-      }
-
       return {
         topic: planItem.name,
         task,
@@ -599,7 +757,6 @@ export default function Dashboard() {
       };
     };
 
-    // 1. Check Quants Plan
     let quantsItem = ALGEBRA_PLAN.find(item => {
       const start = new Date(today.getFullYear(), item.startMonth, item.startDay);
       const end = addDays(start, item.days - 1);
@@ -637,7 +794,6 @@ export default function Dashboard() {
       results.push(buildRec(quantsItem, false, isAlgebra, isArithmetic, isGeometry));
     }
 
-    // 2. Check LR Plan
     const lrItem = LR_PLAN.find(item => {
       const start = new Date(today.getFullYear(), item.startMonth, item.startDay);
       const end = addDays(start, item.days - 1);
@@ -650,40 +806,11 @@ export default function Dashboard() {
 
     if (results.length > 0) return results;
 
-    const isWeekend = [0, 6].includes(today.getDay());
-
-    // Find topics studied this week (Monday to Friday)
-    const mondayOfThisWeek = subDays(today, today.getDay() === 0 ? 6 : today.getDay() - 1);
-    const fridayOfThisWeek = addDays(mondayOfThisWeek, 4);
-      
-    const weeklySessions = sessions.filter(s => {
-      const d = new Date(s.date);
-      return d >= mondayOfThisWeek && d <= fridayOfThisWeek && s.timeSpent > 0;
-    });
-    
-    const weeklyTopicsSet = new Set();
-    weeklySessions.forEach(s => {
-      if (s.subTopic) weeklyTopicsSet.add(s.subTopic);
-      if (s.subTopics) s.subTopics.forEach(t => weeklyTopicsSet.add(t));
-    });
-    const weeklyTopics = [...weeklyTopicsSet];
-    
-    if (weeklyTopics.length > 0) {
-      return {
-        topic: "Weekly Intensive Practice",
-        task: `Solve Arun Sharma Level 1 & 2 questions for: ${weeklyTopics.join(', ')}`,
-        section: 'mixed',
-        category: 'Weekend Special',
-        isWeeklyReview: true,
-        weeklyTopics
-      };
-    }
-
     const allPending = [];
     for (const section in CAT_SYLLABUS) {
       for (const cat of CAT_SYLLABUS[section]) {
         for (const topic of cat.topics) {
-          const isDone = sessions.some(s => s.topic === section && (s.subTopic === topic || (s.subTopics && s.subTopics.includes(topic))));
+          const isDone = sessions.some(s => s.topic === section && (s.subTopics && s.subTopics.includes(topic)));
           if (!isDone) {
             allPending.push({ section, category: cat.category, topic, importance: cat.importance });
           }
@@ -706,7 +833,6 @@ export default function Dashboard() {
   const recommendation = getRecommendation();
   const forecast = getForecast();
 
-  // Chart Generators
   const generateChartData = () => {
     const data = [];
     for (let i = 6; i >= 0; i--) {
@@ -743,16 +869,10 @@ export default function Dashboard() {
   const generateSyllabusProgress = () => {
     return SYLLABUS_TOPICS.map(sectionInfo => {
       const topicSessions = sessions.filter(s => s.topic === sectionInfo.id);
-      const timeSpent = topicSessions.reduce((sum, s) => sum + s.timeSpent, 0);
-      const qsDone = topicSessions.reduce((sum, s) => sum + s.questionsDone, 0);
-      
       const allSyllabusTopics = new Set(CAT_SYLLABUS[sectionInfo.id].flatMap(cat => cat.topics));
       const coveredTopicsSet = new Set<string>();
       
       topicSessions.forEach(s => {
-        if (s.subTopic && ALL_SYLLABUS_TOPICS_SET.has(s.subTopic) && allSyllabusTopics.has(s.subTopic)) {
-          coveredTopicsSet.add(s.subTopic);
-        }
         if (s.subTopics) {
           s.subTopics.forEach(t => {
             if (ALL_SYLLABUS_TOPICS_SET.has(t) && allSyllabusTopics.has(t)) {
@@ -765,14 +885,13 @@ export default function Dashboard() {
       const coveredTopics = coveredTopicsSet.size;
       const totalTopicsCount = allSyllabusTopics.size;
       const progress = Math.min(100, Math.round((coveredTopics / totalTopicsCount) * 100)) || 0;
-      return { ...sectionInfo, progress, timeSpent, qsDone, coveredTopics, totalTopicsCount };
+      return { ...sectionInfo, progress, coveredTopics, totalTopicsCount };
     });
   };
 
   const getTopicStats = () => {
     const topicMap: Record<string, { time: number, qs: number, mastered: boolean, section: string, l1: number, l2: number, l3: number }> = {};
     
-    // Initialize with all topics
     Object.entries(CAT_SYLLABUS).forEach(([section, categories]) => {
       categories.forEach(cat => {
         cat.topics.forEach(topic => {
@@ -782,30 +901,23 @@ export default function Dashboard() {
     });
 
     const masteryLocked = new Set();
-
     sessions.forEach(s => {
       if (s.subTopics) {
         s.subTopics.forEach(topic => {
           if (topicMap[topic]) {
             topicMap[topic].time += s.timeSpent;
-            
             const tq = s.topicQuestions?.[topic];
             if (typeof tq === 'object' && tq !== null) {
               topicMap[topic].l1 += (tq as any).l1 || 0;
               topicMap[topic].l2 += (tq as any).l2 || 0;
               topicMap[topic].l3 += (tq as any).l3 || 0;
               topicMap[topic].qs += ((tq as any).l1 || 0) + ((tq as any).l2 || 0) + ((tq as any).l3 || 0);
-              
               if (!masteryLocked.has(topic)) {
                 topicMap[topic].mastered = (tq as any).mastered || false;
                 masteryLocked.add(topic);
               }
             } else {
               topicMap[topic].qs += Number(tq) || 0;
-              if (!masteryLocked.has(topic)) {
-                topicMap[topic].mastered = s.conceptMastered || false;
-                masteryLocked.add(topic);
-              }
             }
           }
         });
@@ -875,11 +987,7 @@ export default function Dashboard() {
           </nav>
         </div>
         
-        <div className={styles.headerRight}>
 
-          <div className={styles.countdownCard} style={{ borderColor: 'var(--accent-secondary)' }}><Target size={32} color="var(--accent-secondary)" /><div><div className={styles.countdownValue} style={{ color: 'var(--accent-secondary)' }}>{phaseInfo.daysLeft}</div><div className={styles.countdownLabel}>Days left in {phaseInfo.id === 1 ? 'Phase 1' : phaseInfo.id === 2 ? 'Phase 2' : 'Phase 3'}</div></div></div>
-          <div className={styles.countdownCard}><CalendarDays size={32} color="#06B6D4" /><div><div className={styles.countdownValue}>{daysLeft}</div><div className={styles.countdownLabel}>Days until CAT</div></div></div>
-        </div>
       </header>
 
       {isTimerActive && (
@@ -904,44 +1012,513 @@ export default function Dashboard() {
       {modalState !== 'closed' && (
         <div className={styles.modalOverlay}>
           <div className={styles.modalContent}>
-            <div className={styles.modalHeader}>
-              <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>
-                {modalState === 'setup' ? "Ignite Your Focus" : 
-                 modalState === 'add_topic' ? "Expand Your Focus" : 
-                 modalState === 'topic_details' ? `Progress: ${selectedSyllabusTopic?.topicName}` :
-                 "Victory Lap: Session Summary"}
-              </h2>
-              <button onClick={() => setModalState('closed')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={28} /></button>
-            </div>
+            {modalState === 'topic_details' && modalView === 'shortcut' && selectedShortcut ? (
+              <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', animation: 'fadeIn 0.3s ease' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>Shortcut Preview</h2>
+                  <button 
+                    onClick={() => setModalView('gallery')}
+                    style={{ background: 'var(--bg-main)', border: 'none', borderRadius: '50%', padding: '0.75rem', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+                <div style={{ flex: 1, position: 'relative', background: '#F8FAFC', borderRadius: '24px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)' }}>
+                  <img 
+                    src={selectedShortcut} 
+                    alt="Shortcut View" 
+                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} 
+                  />
+                </div>
+              </div>
+             ) : modalState === 'topic_details' && modalView === 'category_gallery' ? (
+              <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', animation: 'fadeIn 0.3s ease' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>Complete Trick Gallery</h2>
+                    <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                      {selectedCategory === 'quants' ? 'Quantitative Aptitude' : selectedCategory === 'verbal' ? 'Verbal Ability' : 'DILR'} • 
+                      {topicShortcuts.filter(s => getCategoryTopics(selectedCategory || '').includes(s.topicName)).length} items
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => setModalState('closed')}
+                    style={{ background: 'var(--bg-main)', borderRadius: '50%', padding: '0.75rem', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)' }}
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+
+                {/* Index Section */}
+                {topicShortcuts.filter(s => getCategoryTopics(selectedCategory || '').includes(s.topicName)).length > 0 && (
+                  <div style={{ background: '#F8FAFC', borderRadius: '20px', padding: '1.5rem', marginBottom: '2rem', border: '1px solid var(--border-color)' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <List size={16} /> Trick Index
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '0.75rem' }}>
+                      {topicShortcuts
+                        .filter(s => getCategoryTopics(selectedCategory || '').includes(s.topicName))
+                        .map((s, idx) => (
+                          <button 
+                            key={`index-${s.id}`}
+                            onClick={() => {
+                              const el = document.getElementById(`trick-${s.id}`);
+                              el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }}
+                            style={{ 
+                              textAlign: 'left', 
+                              padding: '0.6rem 1rem', 
+                              background: 'white', 
+                              border: '1px solid var(--border-color)', 
+                              borderRadius: '10px', 
+                              fontSize: '0.85rem', 
+                              fontWeight: 600, 
+                              color: 'var(--text-main)', 
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.75rem',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => { e.currentTarget.style.borderColor = 'var(--accent-primary)'; e.currentTarget.style.color = 'var(--accent-primary)'; }}
+                            onMouseOut={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.color = 'var(--text-main)'; }}
+                          >
+                            <span style={{ opacity: 0.3, fontSize: '0.7rem' }}>{idx + 1}</span>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.title}</span>
+                          </button>
+                        ))
+                      }
+                    </div>
+                  </div>
+                )}
+                <div style={{ flex: 1, overflowY: 'auto', paddingRight: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }} className={styles.customScrollbar}>
+                  {selectedCategory && CAT_SYLLABUS[selectedCategory].map((catGroup, groupIdx) => {
+                    const groupShortcuts = topicShortcuts.filter(s => catGroup.topics.includes(s.topicName));
+                    if (groupShortcuts.length === 0) return null;
+
+                    return (
+                      <div key={catGroup.category} style={{ marginBottom: '3rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem', marginTop: groupIdx === 0 ? '0' : '1.5rem' }}>
+                          <h3 style={{ fontSize: '1.4rem', fontWeight: 900, margin: 0, letterSpacing: '-0.02em', background: 'var(--accent-primary)', color: 'white', padding: '0.5rem 1.5rem', borderRadius: '14px', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.2)' }}>
+                            {catGroup.category}
+                          </h3>
+                          <div style={{ flex: 1, height: '2px', background: 'linear-gradient(90deg, var(--accent-primary) 0%, transparent 100%)', opacity: 0.2 }}></div>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                          {groupShortcuts.map((s, idx) => (
+                            <div id={`trick-${s.id}`} key={s.id} style={{ position: 'relative', borderRadius: '24px', overflow: 'hidden', border: '1px solid var(--border-color)', background: '#F8FAFC', padding: '1.5rem', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                  <div style={{ background: 'rgba(0,0,0,0.06)', color: 'var(--text-main)', padding: '0.4rem 1rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
+                                    #{idx + 1}
+                                  </div>
+                                  <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.01em' }}>
+                                    {s.title}
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'white', padding: '0.4rem 1rem', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-primary)', border: '1px solid var(--border-color)', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                                  <BookOpen size={16} />
+                                  {s.topicName}
+                                </div>
+                              </div>
+                              <img 
+                                src={s.imageData} 
+                                alt={`Shortcut ${idx + 1}`} 
+                                style={{ width: '100%', height: 'auto', display: 'block', borderRadius: '16px', cursor: 'pointer', boxShadow: '0 8px 25px rgba(0,0,0,0.08)' }} 
+                                onClick={() => {
+                                  setSelectedShortcut(s.imageData);
+                                  setModalView('shortcut');
+                                }}
+                              />
+                              <button 
+                                className={styles.deleteShortcut} 
+                                style={{ top: '1.5rem', right: '1.5rem', background: 'rgba(239, 68, 68, 0.9)', color: 'white', opacity: 0, transition: 'opacity 0.2s' }}
+                                onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
+                                onMouseOut={(e) => e.currentTarget.style.opacity = '0'}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteShortcut(s.id, e);
+                                }}
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {selectedCategory && topicShortcuts.filter(s => getCategoryTopics(selectedCategory).includes(s.topicName)).length === 0 && (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', color: 'var(--text-muted)', padding: '4rem 0' }}>
+                      <ImageOff size={48} opacity={0.3} />
+                      <p>No shortcuts uploaded for this category yet.</p>
+                      <button onClick={() => setModalState('closed')} className={styles.btnPrimary} style={{ width: 'auto' }}>Return to Syllabus</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : modalState === 'topic_details' && modalView === 'gallery' ? (
+              <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', animation: 'fadeIn 0.3s ease' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>Shortcuts Gallery</h2>
+                    <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>{selectedSyllabusTopic?.topicName} • {topicShortcuts.filter(s => s.topicName === selectedSyllabusTopic?.topicName).length} items</p>
+                  </div>
+                  <button 
+                    onClick={() => setModalView('details')}
+                    style={{ background: 'var(--bg-main)', borderRadius: '50%', padding: '0.75rem', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)' }}
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+
+                {/* Topic Index Section */}
+                {topicShortcuts.filter(s => s.topicName === selectedSyllabusTopic?.topicName).length > 0 && (
+                  <div style={{ background: '#F8FAFC', borderRadius: '20px', padding: '1.5rem', marginBottom: '2rem', border: '1px solid var(--border-color)' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <List size={16} /> Topic Index
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '0.75rem' }}>
+                      {topicShortcuts
+                        .filter(s => s.topicName === selectedSyllabusTopic?.topicName)
+                        .map((s, idx) => (
+                          <button 
+                            key={`topic-index-${s.id}`}
+                            onClick={() => {
+                              const el = document.getElementById(`trick-${s.id}`);
+                              el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }}
+                            style={{ 
+                              textAlign: 'left', 
+                              padding: '0.6rem 1rem', 
+                              background: 'white', 
+                              border: '1px solid var(--border-color)', 
+                              borderRadius: '10px', 
+                              fontSize: '0.85rem', 
+                              fontWeight: 600, 
+                              color: 'var(--text-main)', 
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.75rem',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => { e.currentTarget.style.borderColor = 'var(--accent-primary)'; e.currentTarget.style.color = 'var(--accent-primary)'; }}
+                            onMouseOut={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.color = 'var(--text-main)'; }}
+                          >
+                            <span style={{ opacity: 0.3, fontSize: '0.7rem' }}>{idx + 1}</span>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.title}</span>
+                          </button>
+                        ))
+                      }
+                    </div>
+                  </div>
+                )}
+                <div style={{ flex: 1, overflowY: 'auto', paddingRight: '1rem', display: 'flex', flexDirection: 'column', gap: '2rem' }} className={styles.customScrollbar}>
+                  {topicShortcuts
+                    .filter(s => s.topicName === selectedSyllabusTopic?.topicName)
+                    .map((s, idx) => (
+                      <div id={`trick-${s.id}`} key={s.id} style={{ position: 'relative', borderRadius: '24px', overflow: 'hidden', border: '1px solid var(--border-color)', background: '#F8FAFC', padding: '1rem' }}>
+                        <div style={{ position: 'absolute', top: '1.5rem', left: '1.5rem', background: 'rgba(255,255,255,0.9)', padding: '0.4rem 1rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, zIndex: 5, border: '1px solid rgba(0,0,0,0.1)' }}>
+                          TRICK #{idx + 1}: {s.title}
+                        </div>
+                        <img 
+                          src={s.imageData} 
+                          alt={`Shortcut ${idx + 1}`} 
+                          style={{ width: '100%', height: 'auto', borderRadius: '16px', display: 'block', cursor: 'zoom-in' }} 
+                          onClick={() => {
+                            setSelectedShortcut(s.imageData);
+                            setModalView('shortcut');
+                          }}
+                        />
+                        <button 
+                          onClick={(e) => handleDeleteShortcut(s.id, e)}
+                          style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: '#EF4444', color: 'white', border: 'none', borderRadius: '10px', padding: '0.5rem', cursor: 'pointer', zIndex: 5 }}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    ))}
+                  {topicShortcuts.filter(s => s.topicName === selectedSyllabusTopic?.topicName).length === 0 && (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', gap: '1rem' }}>
+                      <ImageOff size={48} opacity={0.3} />
+                      <p>No shortcuts uploaded for this topic yet.</p>
+                      <button onClick={() => setModalView('details')} className={styles.btnPrimary} style={{ width: 'auto' }}>Go Back to Upload</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : modalState === 'topic_details' && modalView === 'questions_gallery' ? (
+              <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', animation: 'fadeIn 0.3s ease' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>Questions Gallery</h2>
+                    <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>{selectedSyllabusTopic?.topicName}</p>
+                  </div>
+                  <button 
+                    onClick={() => setModalView('details')}
+                    style={{ background: 'var(--bg-main)', border: 'none', borderRadius: '50%', padding: '0.75rem', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+
+                {/* Index Section */}
+                {importantQuestions.filter(q => q.topicName === selectedSyllabusTopic?.topicName).length > 0 && (
+                  <div style={{ background: '#F0FDFA', borderRadius: '20px', padding: '1.5rem', marginBottom: '2rem', border: '1px solid rgba(20, 184, 166, 0.2)' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#14B8A6', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <List size={16} /> Question Index
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '0.75rem' }}>
+                      {importantQuestions
+                        .filter(q => q.topicName === selectedSyllabusTopic?.topicName)
+                        .map((q, idx) => (
+                          <button 
+                            key={`index-q-${q.id}`}
+                            onClick={() => {
+                              const el = document.getElementById(`question-${q.id}`);
+                              el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }}
+                            style={{ 
+                              textAlign: 'left', 
+                              padding: '0.6rem 1rem', 
+                              background: 'white', 
+                              border: '1px solid var(--border-color)', 
+                              borderRadius: '10px', 
+                              fontSize: '0.85rem', 
+                              fontWeight: 600, 
+                              color: 'var(--text-main)', 
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.75rem',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => { e.currentTarget.style.borderColor = 'var(--accent-secondary)'; e.currentTarget.style.color = 'var(--accent-secondary)'; }}
+                            onMouseOut={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.color = 'var(--text-main)'; }}
+                          >
+                            <span style={{ opacity: 0.3, fontSize: '0.7rem' }}>{idx + 1}</span>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.title}</span>
+                          </button>
+                        ))
+                      }
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ flex: 1, overflowY: 'auto', paddingRight: '1rem', display: 'flex', flexDirection: 'column', gap: '2rem' }} className={styles.customScrollbar}>
+                  {importantQuestions
+                    .filter(q => q.topicName === selectedSyllabusTopic?.topicName)
+                    .map((q, idx) => (
+                      <div id={`question-${q.id}`} key={q.id} style={{ position: 'relative', borderRadius: '24px', overflow: 'hidden', border: '1px solid var(--border-color)', background: '#F8FAFC', padding: '1rem' }}>
+                        <div style={{ position: 'absolute', top: '1.5rem', left: '1.5rem', background: 'rgba(255,255,255,0.9)', padding: '0.4rem 1rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800, zIndex: 5, border: '1px solid rgba(6, 182, 212, 0.2)', color: 'var(--accent-secondary)' }}>
+                          QUESTION #{idx + 1}: {q.title}
+                        </div>
+                        <img 
+                          src={q.imageData} 
+                          alt={`Question ${idx + 1}`} 
+                          style={{ width: '100%', height: 'auto', borderRadius: '16px', display: 'block', cursor: 'zoom-in' }} 
+                          onClick={() => {
+                            setSelectedShortcut(q.imageData);
+                            setModalView('shortcut');
+                          }}
+                        />
+                        <button 
+                          onClick={(e) => handleDeleteQuestion(q.id, e)}
+                          style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: '#EF4444', color: 'white', border: 'none', borderRadius: '10px', padding: '0.5rem', cursor: 'pointer', zIndex: 5 }}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    ))}
+                  {importantQuestions.filter(q => q.topicName === selectedSyllabusTopic?.topicName).length === 0 && (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', gap: '1rem' }}>
+                      <FileText size={48} opacity={0.3} />
+                      <p>No important questions uploaded for this topic yet.</p>
+                      <button onClick={() => setModalView('details')} className={styles.btnPrimary} style={{ width: 'auto' }}>Go Back to Upload</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : modalState === 'topic_details' && modalView === 'category_questions_gallery' ? (
+              <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', animation: 'fadeIn 0.3s ease' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <div>
+                    <h2 style={{ fontSize: '1.75rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>Complete Question Gallery</h2>
+                    <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                      {selectedCategory === 'quants' ? 'Quantitative Aptitude' : selectedCategory === 'verbal' ? 'Verbal Ability' : 'DILR'} • 
+                      {importantQuestions.filter(q => getCategoryTopics(selectedCategory || '').includes(q.topicName)).length} items
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => setModalState('closed')}
+                    style={{ background: 'var(--bg-main)', borderRadius: '50%', padding: '0.75rem', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)' }}
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+
+                {/* Index Section */}
+                {importantQuestions.filter(q => getCategoryTopics(selectedCategory || '').includes(q.topicName)).length > 0 && (
+                  <div style={{ background: '#F0FDFA', borderRadius: '20px', padding: '1.5rem', marginBottom: '2rem', border: '1px solid rgba(20, 184, 166, 0.2)' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#14B8A6', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <List size={16} /> Question Index
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '0.75rem' }}>
+                      {importantQuestions
+                        .filter(q => getCategoryTopics(selectedCategory || '').includes(q.topicName))
+                        .map((q, idx) => (
+                          <button 
+                            key={`index-q-${q.id}`}
+                            onClick={() => {
+                              const el = document.getElementById(`question-${q.id}`);
+                              el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }}
+                            style={{ 
+                              textAlign: 'left', 
+                              padding: '0.6rem 1rem', 
+                              background: 'white', 
+                              border: '1px solid var(--border-color)', 
+                              borderRadius: '10px', 
+                              fontSize: '0.85rem', 
+                              fontWeight: 600, 
+                              color: 'var(--text-main)', 
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.75rem',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={(e) => { e.currentTarget.style.borderColor = 'var(--accent-secondary)'; e.currentTarget.style.color = 'var(--accent-secondary)'; }}
+                            onMouseOut={(e) => { e.currentTarget.style.borderColor = 'var(--border-color)'; e.currentTarget.style.color = 'var(--text-main)'; }}
+                          >
+                            <span style={{ opacity: 0.3, fontSize: '0.7rem' }}>{idx + 1}</span>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.title}</span>
+                          </button>
+                        ))
+                      }
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ flex: 1, overflowY: 'auto', paddingRight: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }} className={styles.customScrollbar}>
+                  {selectedCategory && CAT_SYLLABUS[selectedCategory].map((catGroup, groupIdx) => {
+                    const groupQuestions = importantQuestions.filter(q => catGroup.topics.includes(q.topicName));
+                    if (groupQuestions.length === 0) return null;
+
+                    return (
+                      <div key={catGroup.category} style={{ marginBottom: '3rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem', marginTop: groupIdx === 0 ? '0' : '1.5rem' }}>
+                          <h3 style={{ fontSize: '1.4rem', fontWeight: 900, margin: 0, letterSpacing: '-0.02em', background: 'var(--accent-secondary)', color: 'white', padding: '0.5rem 1.5rem', borderRadius: '14px', boxShadow: '0 4px 12px rgba(6, 182, 212, 0.2)' }}>
+                            {catGroup.category}
+                          </h3>
+                          <div style={{ flex: 1, height: '2px', background: 'linear-gradient(90deg, var(--accent-secondary) 0%, transparent 100%)', opacity: 0.2 }}></div>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                          {groupQuestions.map((q, idx) => (
+                            <div id={`question-${q.id}`} key={q.id} style={{ position: 'relative', borderRadius: '24px', overflow: 'hidden', border: '1px solid var(--border-color)', background: '#F8FAFC', padding: '1.5rem', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                  <div style={{ background: 'rgba(0,0,0,0.06)', color: 'var(--text-main)', padding: '0.4rem 1rem', borderRadius: '10px', fontSize: '0.75rem', fontWeight: 800 }}>
+                                    #{idx + 1}
+                                  </div>
+                                  <div style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.01em' }}>
+                                    {q.title}
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', background: 'white', padding: '0.4rem 1rem', borderRadius: '10px', fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-secondary)', border: '1px solid var(--border-color)', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                                  <FileText size={16} />
+                                  {q.topicName}
+                                </div>
+                              </div>
+                              <img 
+                                src={q.imageData} 
+                                alt={`Question ${idx + 1}`} 
+                                style={{ width: '100%', height: 'auto', display: 'block', borderRadius: '16px', cursor: 'pointer', boxShadow: '0 8px 25px rgba(0,0,0,0.08)' }} 
+                                onClick={() => {
+                                  setSelectedShortcut(q.imageData);
+                                  setModalView('shortcut');
+                                }}
+                              />
+                              <button 
+                                className={styles.deleteShortcut} 
+                                style={{ top: '1.5rem', right: '1.5rem', background: 'rgba(239, 68, 68, 0.9)', color: 'white', opacity: 0, transition: 'opacity 0.2s' }}
+                                onMouseOver={(e) => e.currentTarget.style.opacity = '1'}
+                                onMouseOut={(e) => e.currentTarget.style.opacity = '0'}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteQuestion(q.id, e);
+                                }}
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {selectedCategory && importantQuestions.filter(q => getCategoryTopics(selectedCategory).includes(q.topicName)).length === 0 && (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', color: 'var(--text-muted)', padding: '4rem 0' }}>
+                      <FileText size={48} opacity={0.3} />
+                      <p>No important questions uploaded for this category yet.</p>
+                      <button onClick={() => setModalState('closed')} className={styles.btnPrimary} style={{ width: 'auto' }}>Return to Syllabus</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className={styles.modalHeader}>
+                  <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>
+                    {modalState === 'setup' ? "Ignite Your Focus" : 
+                     modalState === 'add_topic' ? "Expand Your Focus" : 
+                     modalState === 'topic_details' ? `Progress: ${selectedSyllabusTopic?.topicName}` :
+                     "Victory Lap: Session Summary"}
+                  </h2>
+                  <button onClick={() => setModalState('closed')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}><X size={28} /></button>
+                </div>
 
             {modalState === 'add_topic' && (
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <div className={styles.formGroup}>
-                  <label>Currently Studying</label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
-                    {activeTopics.map(t => <span key={t} className={styles.topicChipDone} style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem' }}>{t}</span>)}
+              <div className={styles.modalBody}>
+                <div style={{ padding: '2rem', background: 'var(--bg-main)', borderRadius: '24px', border: '1px solid var(--border-color)' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '1rem' }}>Active Focus</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    {activeTopics.map(t => <span key={t} className={styles.topicChipDone} style={{ fontSize: '0.8rem', padding: '0.4rem 1rem', borderRadius: '8px' }}>{t}</span>)}
                   </div>
-                  <label>Add Another Topic to this Session</label>
-                  <select className={styles.formSelect} value={""} onChange={e => {
-                    if (e.target.value && !activeTopics.includes(e.target.value)) {
-                      setActiveTopics([...activeTopics, e.target.value]);
-                      setModalState('closed');
-                    }
-                  }}>
-                    <option value="" disabled>Choose a topic...</option>
-                    {CAT_SYLLABUS[activeSection]?.map(cat => (
-                      <optgroup key={cat.category} label={cat.category}>
-                        {cat.topics.filter(t => !activeTopics.includes(t)).map(topic => <option key={topic} value={topic}>{topic}</option>)}
-                      </optgroup>
-                    ))}
-                  </select>
+                  <p style={{ marginTop: '2rem', fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                    Add more topics to your current session. The timer will keep running, and all topics will be logged together.
+                  </p>
                 </div>
-                <button className={styles.btnPrimary} onClick={() => setModalState('closed')}>Back to Session</button>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  <div className={styles.formGroup}>
+                    <label>Select Additional Topic</label>
+                    <select className={styles.formSelect} value={""} onChange={e => {
+                      if (e.target.value && !activeTopics.includes(e.target.value)) {
+                        setActiveTopics([...activeTopics, e.target.value]);
+                        setModalState('closed');
+                      }
+                    }}>
+                      <option value="" disabled>Choose a topic...</option>
+                      {CAT_SYLLABUS[activeSection]?.map(cat => (
+                        <optgroup key={cat.category} label={cat.category}>
+                          {cat.topics.filter(t => !activeTopics.includes(t)).map(topic => <option key={topic} value={topic}>{topic}</option>)}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </div>
+                  <button className={styles.btnPrimary} onClick={() => setModalState('closed')} style={{ padding: '1.25rem', margin: 0 }}>Return to Session</button>
+                </div>
               </div>
             )}
 
             {modalState === 'setup' && (
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <div className={styles.modalBody}>
                 <div className={styles.formGroup}>
                   <label>Select Your Battleground</label>
                   <div className={styles.sectionChipGrid}>
@@ -951,7 +1528,7 @@ export default function Dashboard() {
                         className={`${styles.sectionChip} ${activeSection === t.id ? styles.sectionChipActive : ''}`}
                         onClick={() => {
                           setActiveSection(t.id);
-                          setActiveTopics([]); // Reset topics when section changes
+                          setActiveTopics([]);
                         }}
                       >
                         <BookOpen size={24} />
@@ -959,10 +1536,8 @@ export default function Dashboard() {
                       </div>
                     ))}
                   </div>
-                </div>
-
-                <div className={styles.formGroup}>
-                  <label>Specific Chapter / Topic</label>
+                  
+                  <label style={{ marginTop: '1.5rem' }}>Specific Chapter / Topic</label>
                   <select className={styles.formSelect} value={activeTopics[0] || ""} onChange={e => setActiveTopics([e.target.value])}>
                     <option value="" disabled>Choose a topic...</option>
                     {CAT_SYLLABUS[activeSection]?.map(cat => (
@@ -973,265 +1548,600 @@ export default function Dashboard() {
                   </select>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', margin: '1rem 0', padding: '1rem', background: 'rgba(139, 92, 246, 0.05)', borderRadius: '12px', border: '1px solid rgba(139, 92, 246, 0.1)' }}>
-                  <input type="checkbox" id="practice" checked={isPractice} onChange={e => setIsPractice(e.target.checked)} style={{ width: '22px', height: '22px', cursor: 'pointer' }} />
-                  <label htmlFor="practice" style={{ fontSize: '1rem', fontWeight: 600, cursor: 'pointer', color: 'var(--accent-primary)' }}>This is a Question Practice Session</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div style={{ padding: '2rem', background: 'rgba(139, 92, 246, 0.05)', borderRadius: '20px', border: '1px solid rgba(139, 92, 246, 0.1)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--accent-primary)', textTransform: 'uppercase', marginBottom: '1rem' }}>Session Intensity</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', justifyContent: 'center' }}>
+                      <input type="checkbox" id="practice" checked={isPractice} onChange={e => setIsPractice(e.target.checked)} style={{ width: '24px', height: '24px', cursor: 'pointer' }} />
+                      <label htmlFor="practice" style={{ fontSize: '1.1rem', fontWeight: 700, cursor: 'pointer', color: 'var(--text-main)' }}>Question Practice</label>
+                    </div>
+                  </div>
+                  
+                  <button className={styles.btnPrimary} onClick={handleStartStudy} disabled={activeTopics.length === 0} style={{ padding: '1.5rem', opacity: activeTopics.length === 0 ? 0.5 : 1 }}>
+                    <Play size={24} fill="currentColor" /> Start Study Session
+                  </button>
+                  <p style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>AI will track your progress and adjust your roadmap.</p>
                 </div>
-
-                <button className={styles.btnPrimary} onClick={handleStartStudy} disabled={activeTopics.length === 0} style={{ marginTop: '1rem', opacity: activeTopics.length === 0 ? 0.5 : 1 }}>
-                  <Play size={20} fill="currentColor" /> Let's Go! Start Studying
-                </button>
               </div>
             )}
 
             {modalState === 'save' && (
-              <form onSubmit={handleSaveSession} style={{ display: 'flex', flexDirection: 'column' }}>
-                <div style={{ textAlign: 'center', marginBottom: '2rem', padding: '2rem', background: 'var(--bg-main)', borderRadius: '20px' }}>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem', fontWeight: 700, textTransform: 'uppercase' }}>Focus Time</div>
-                  <div style={{ fontSize: '3.5rem', fontWeight: 800, color: 'var(--accent-primary)', letterSpacing: '-2px' }}>{formatTime(elapsedSeconds)}</div>
+              <form onSubmit={handleSaveSession} className={styles.modalBody}>
+                <div style={{ textAlign: 'center', padding: '2.5rem', background: 'var(--bg-main)', borderRadius: '24px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '0.5rem' }}>Focus Time Achieved</div>
+                  <div style={{ fontSize: '4.5rem', fontWeight: 800, color: 'var(--accent-primary)', letterSpacing: '-3px', lineHeight: 1 }}>{formatTime(elapsedSeconds)}</div>
+                  <div style={{ marginTop: '2rem', display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', background: 'rgba(16, 185, 129, 0.05)', borderRadius: '16px', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
+                    <input type="checkbox" id="concept" checked={conceptMastered} onChange={e => setConceptMastered(e.target.checked)} style={{ width: '22px', height: '22px', cursor: 'pointer' }} />
+                    <label htmlFor="concept" style={{ fontSize: '0.95rem', fontWeight: 700, cursor: 'pointer', color: '#059669' }}>I've mastered this concept!</label>
+                  </div>
                 </div>
                 
-                {isPractice && activeTopics.length > 1 ? (
-                  activeTopics.map(topic => (
-                    <div key={topic} className={styles.formGroup} style={{ marginBottom: '1rem' }}>
-                      <label style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Questions for {topic}</label>
-                      <input 
-                        className={styles.formInput} 
-                        type="number" 
-                        min="0" 
-                        value={topicQuestions[topic] || ''} 
-                        onChange={e => {
-                          const val = e.target.value;
-                          setTopicQuestions(prev => ({ ...prev, [topic]: val }));
-                          // Also update total questionsDone
-                          const newTopics = { ...topicQuestions, [topic]: val };
-                          const total = Object.values(newTopics).reduce((sum, v) => sum + (Number(v) || 0), 0);
-                          setQuestionsDone(total.toString());
-                        }} 
-                        placeholder={`How many problems for ${topic}?`} 
-                      />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                  {isPractice && activeTopics.length > 1 ? (
+                    activeTopics.map(topic => (
+                      <div key={topic} className={styles.formGroup} style={{ marginBottom: '0' }}>
+                        <label style={{ fontSize: '0.85rem' }}>Questions for {topic}</label>
+                        <input 
+                          className={styles.formInput} 
+                          type="number" 
+                          min="0" 
+                          value={topicQuestions[topic] || ''} 
+                          onChange={e => {
+                            const val = e.target.value;
+                            setTopicQuestions(prev => ({ ...prev, [topic]: val }));
+                            const newTopics = { ...topicQuestions, [topic]: val };
+                            const total = Object.values(newTopics).reduce((sum, v) => sum + (Number(v) || 0), 0);
+                            setQuestionsDone(total.toString());
+                          }} 
+                          placeholder={`Questions?`} 
+                        />
+                      </div>
+                    ))
+                  ) : (
+                    <div className={styles.formGroup}>
+                      <label>{isPractice ? "Total Questions Solved" : "Questions Conquered"}</label>
+                      <input className={styles.formInput} type="number" min="0" value={questionsDone} onChange={e => setQuestionsDone(e.target.value)} placeholder="0" />
                     </div>
-                  ))
-                ) : (
-                  <div className={styles.formGroup}>
-                    <label>{isPractice ? "Total Questions Solved" : "Questions Conquered"}</label>
-                    <input className={styles.formInput} type="number" min="0" value={questionsDone} onChange={e => setQuestionsDone(e.target.value)} placeholder="How many problems did you solve?" />
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', margin: '1rem 0', padding: '1rem', background: 'rgba(16, 185, 129, 0.05)', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
-                  <input type="checkbox" id="concept" checked={conceptMastered} onChange={e => setConceptMastered(e.target.checked)} style={{ width: '22px', height: '22px', cursor: 'pointer' }} />
-                  <label htmlFor="concept" style={{ fontSize: '1rem', fontWeight: 600, cursor: 'pointer', color: '#059669' }}>I've mastered this concept today!</label>
+                  )}
+                  
+                  <button type="submit" className={styles.btnSuccess} style={{ padding: '1.5rem', marginTop: 'auto' }}>
+                    {isPractice ? 'Save Practice Data' : 'Log Victory'}
+                  </button>
                 </div>
-
-                <button type="submit" className={styles.btnSuccess} style={{ marginTop: '1rem' }}>
-                  {isPractice ? 'Log Practice Results' : 'Log My Victory'}
-                </button>
               </form>
             )}
 
             {modalState === 'topic_details' && selectedSyllabusTopic && (
-              <form onSubmit={handleSaveTopicProgress} style={{ display: 'flex', flexDirection: 'column' }}>
-                <div style={{ padding: '1rem', background: 'var(--bg-main)', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
-                  <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>SECTION: {selectedSyllabusTopic.sectionId.toUpperCase()}</p>
-                  <p style={{ margin: '0.25rem 0 0', fontSize: '1.1rem', fontWeight: 800 }}>{selectedSyllabusTopic.topicName}</p>
+              <form onSubmit={handleSaveTopicProgress} className={styles.modalBody}>
+                <div style={{ padding: '2rem', background: 'var(--bg-main)', borderRadius: '24px', border: '1px solid var(--border-color)' }}>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase' }}>Section Tracking: {selectedSyllabusTopic.sectionId.toUpperCase()}</p>
+                  <p style={{ margin: '0.5rem 0 1.5rem', fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.5px' }}>{selectedSyllabusTopic.topicName}</p>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', background: 'rgba(16, 185, 129, 0.05)', borderRadius: '16px', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
+                    <input type="checkbox" id="topic-mastery" checked={conceptMastered} onChange={e => setConceptMastered(e.target.checked)} style={{ width: '22px', height: '22px', cursor: 'pointer' }} />
+                    <label htmlFor="topic-mastery" style={{ fontSize: '1rem', fontWeight: 700, cursor: 'pointer', color: '#059669' }}>Concept Mastered</label>
+                  </div>
+                  
+                  <p style={{ marginTop: '1.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                    Log your practice questions to update your proficiency level. AI will recalibrate your study plan based on these numbers.
+                  </p>
+                  <div className={styles.twoColGrid} style={{ marginTop: '1.5rem' }}>
+                    {/* Shortcuts Repository Card */}
+                    <div style={{ 
+                      background: 'rgba(139, 92, 246, 0.02)', 
+                      border: '1px solid rgba(139, 92, 246, 0.1)', 
+                      borderRadius: '20px', 
+                      padding: '1.25rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1rem',
+                      transition: 'all 0.2s ease'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--accent-primary)' }}>
+                          <div style={{ background: 'rgba(139, 92, 246, 0.1)', padding: '0.5rem', borderRadius: '10px' }}>
+                            <Image size={18} />
+                          </div>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tricks</span>
+                        </div>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', background: 'white', padding: '0.2rem 0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                          {topicShortcuts.filter(s => s.topicName === selectedSyllabusTopic.topicName).length}
+                        </span>
+                      </div>
+                      
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button 
+                          type="button"
+                          onClick={() => setModalView('gallery')}
+                          className={styles.btnSecondary}
+                          style={{ flex: 2, padding: '0.6rem', fontSize: '0.8rem', margin: 0, background: 'white', border: '1px solid var(--border-color)', borderRadius: '12px' }}
+                        >
+                          View Gallery
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => shortcutInputRef.current?.click()}
+                          className={styles.btnSecondary}
+                          style={{ flex: 1, padding: '0.6rem', fontSize: '0.8rem', margin: 0, background: 'var(--accent-primary)', color: 'white', border: 'none', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          <Plus size={18} />
+                        </button>
+                        <input type="file" ref={shortcutInputRef} style={{ display: 'none' }} accept="image/*" onChange={handleShortcutUpload} />
+                      </div>
+                    </div>
+
+                    {/* Questions Repository Card */}
+                    <div style={{ 
+                      background: 'rgba(20, 184, 166, 0.02)', 
+                      border: '1px solid rgba(20, 184, 166, 0.1)', 
+                      borderRadius: '20px', 
+                      padding: '1.25rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1rem',
+                      transition: 'all 0.2s ease'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#14B8A6' }}>
+                          <div style={{ background: 'rgba(20, 184, 166, 0.1)', padding: '0.5rem', borderRadius: '10px' }}>
+                            <FileText size={18} />
+                          </div>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Questions</span>
+                        </div>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', background: 'white', padding: '0.2rem 0.6rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                          {importantQuestions.filter(q => q.topicName === selectedSyllabusTopic.topicName).length}
+                        </span>
+                      </div>
+                      
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button 
+                          type="button"
+                          onClick={() => setModalView('questions_gallery')}
+                          className={styles.btnSecondary}
+                          style={{ flex: 2, padding: '0.6rem', fontSize: '0.8rem', margin: 0, background: 'white', border: '1px solid var(--border-color)', borderRadius: '12px' }}
+                        >
+                          View Gallery
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => questionInputRef.current?.click()}
+                          className={styles.btnSecondary}
+                          style={{ flex: 1, padding: '0.6rem', fontSize: '0.8rem', margin: 0, background: '#14B8A6', color: 'white', border: 'none', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          <Plus size={18} />
+                        </button>
+                        <input type="file" ref={questionInputRef} style={{ display: 'none' }} accept="image/*" onChange={handleQuestionUpload} />
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div className={styles.formGroup}>
-                  <label>Level 1 Questions Done</label>
-                  <input className={styles.formInput} type="number" min="0" value={l1Count} onChange={e => setL1Count(e.target.value)} placeholder="0" />
-                </div>
-                <div className={styles.formGroup}>
-                  <label>Level 2 Questions Done</label>
-                  <input className={styles.formInput} type="number" min="0" value={l2Count} onChange={e => setL2Count(e.target.value)} placeholder="0" />
-                </div>
-                <div className={styles.formGroup}>
-                  <label>Level 3 Questions Done</label>
-                  <input className={styles.formInput} type="number" min="0" value={l3Count} onChange={e => setL3Count(e.target.value)} placeholder="0" />
-                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  <div className={styles.inputsGrid}>
+                    <div className={styles.formGroup} style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: '0.7rem' }}>LEVEL 1</label>
+                      <input className={styles.formInput} type="number" min="0" value={l1Count} onChange={e => setL1Count(e.target.value)} placeholder="0" />
+                    </div>
+                    <div className={styles.formGroup} style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: '0.7rem' }}>LEVEL 2</label>
+                      <input className={styles.formInput} type="number" min="0" value={l2Count} onChange={e => setL2Count(e.target.value)} placeholder="0" />
+                    </div>
+                    <div className={styles.formGroup} style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: '0.7rem' }}>LEVEL 3</label>
+                      <input className={styles.formInput} type="number" min="0" value={l3Count} onChange={e => setL3Count(e.target.value)} placeholder="0" />
+                    </div>
+                  </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', margin: '1rem 0', padding: '1rem', background: 'rgba(16, 185, 129, 0.05)', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.1)' }}>
-                  <input type="checkbox" id="topic-mastery" checked={conceptMastered} onChange={e => setConceptMastered(e.target.checked)} style={{ width: '22px', height: '22px', cursor: 'pointer' }} />
-                  <label htmlFor="topic-mastery" style={{ fontSize: '1rem', fontWeight: 600, cursor: 'pointer', color: '#059669' }}>Concept Covered & Mastered</label>
-                </div>
-
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-                  <button type="submit" className={styles.btnPrimary} style={{ flex: 2 }}>
-                    Save Progress
-                  </button>
-                  <button type="button" onClick={handleResetTopicProgress} style={{ flex: 1, background: 'rgba(239, 68, 68, 0.05)', color: '#EF4444', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '12px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}>
-                    Reset
-                  </button>
+                  <div style={{ display: 'flex', gap: '1rem', marginTop: 'auto', paddingTop: '1rem' }}>
+                    <button type="submit" className={styles.btnPrimary} style={{ flex: 2, margin: 0 }}>
+                      Save Progress
+                    </button>
+                    <button type="button" onClick={handleResetTopicProgress} style={{ flex: 1, background: 'rgba(239, 68, 68, 0.05)', color: '#EF4444', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '14px', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}>
+                      Reset
+                    </button>
+                  </div>
                 </div>
               </form>
             )}
+          </>
+        )}
           </div>
         </div>
       )}
 
       {activeTab === 'dashboard' && (
         <>
-          <div className={styles.grid}>
-            <div className={`${styles.card} ${styles.cardPrimary}`}><div className={styles.cardHeader}><span className={styles.cardTitle}>Total Study Time</span><div className={`${styles.cardIcon} ${styles.cardIconPrimary}`}><Clock size={20} /></div></div><div className={styles.cardValue}>{totalStudyTime.toFixed(1)}h</div><div className={styles.cardSubtext}>Lifetime hours logged</div></div>
-            <div className={`${styles.card} ${styles.cardSecondary}`}><div className={styles.cardHeader}><span className={styles.cardTitle}>Concepts Mastered</span><div className={`${styles.cardIcon} ${styles.cardIconSecondary}`}><BookOpen size={20} /></div></div><div className={styles.cardValue}>{totalConcepts}</div><div className={styles.cardSubtext}>Key topics understood</div></div>
-            <div className={`${styles.card} ${styles.cardTertiary}`}><div className={styles.cardHeader}><span className={styles.cardTitle}>Practice Qs Done</span><div className={`${styles.cardIcon} ${styles.cardIconTertiary}`}><Target size={20} /></div></div><div className={styles.cardValue}>{totalQuestions}</div><div className={styles.cardSubtext}>Problems solved</div></div>
-            <div className={`${styles.card} ${styles.cardSuccess}`}><div className={styles.cardHeader}><span className={styles.cardTitle}>{phaseInfo.metricName}</span><div className={`${styles.cardIcon} ${styles.cardIconSuccess}`}><Target size={20} /></div></div><div className={styles.cardValue}>{phaseInfo.metricValue}</div><div className={styles.cardSubtext}>{phaseInfo.name}</div></div>
-            <div className={`${styles.card} ${styles.cardSuccess}`} style={{ background: 'var(--bg-main)', border: '1px solid var(--border-color)' }}><div className={styles.cardHeader}><span className={styles.cardTitle}>Current Streak</span><div className={`${styles.cardIcon} ${styles.cardIconSuccess}`}><Flame size={20} /></div></div><div className={styles.cardValue}>{calculateStreak()} Days</div><div className={styles.cardSubtext}>Keep going!</div></div>
-          </div>
 
-          {forecast && phaseInfo.id === 1 && (
-            <div className={styles.forecastBanner} style={{ borderColor: forecast.isOnTrack ? 'var(--accent-success)' : 'var(--accent-tertiary)' }}>
-              <div className={styles.forecastInfo}>
-                <div className={styles.forecastIcon} style={{ background: forecast.isOnTrack ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)' }}>
-                  {forecast.isOnTrack ? <CheckCircle2 size={24} color="#10B981" /> : <AlertTriangle size={24} color="#F59E0B" />}
+
+          <div style={{ marginBottom: '2.5rem' }}>
+            <div className={styles.largeCardsGrid}>
+              {/* Primary: Phase Progress */}
+              <div className={`${styles.largeCard} ${styles.largeCardPrimary}`}>
+                <div style={{ position: 'relative', zIndex: 2 }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, opacity: 0.8, textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '0.75rem' }}>CURRENT STATUS</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                    <div>
+                      <div style={{ fontSize: '2.75rem', fontWeight: 900, letterSpacing: '-1px' }}>PHASE {syllabusPhase}</div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 600, opacity: 0.9, marginTop: '0.25rem' }}>Foundation & Critical Topics</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '3.5rem', fontWeight: 900, lineHeight: 1 }}>66</div>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.8, textTransform: 'uppercase' }}>Days Remaining</div>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Study Forecast: {forecast.isOnTrack ? 'On Track' : 'Needs Speed'}</h3>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{forecast.advice}</p>
-                </div>
-              </div>
-              <div className={styles.forecastStats}>
-                <div className={styles.forecastStat}>
-                  <div className={styles.forecastStatLabel}>Required Pace</div>
-                  <div className={styles.forecastStatValue}>{forecast.requiredTopicsPerDay} <span style={{ fontSize: '0.7rem' }}>topics/day</span></div>
-                </div>
-                <div className={styles.forecastStatDivider} />
-                <div className={styles.forecastStat}>
-                  <div className={styles.forecastStatLabel}>Current Pace</div>
-                  <div className={styles.forecastStatValue} style={{ color: forecast.isOnTrack ? 'var(--accent-success)' : 'var(--accent-danger)' }}>{forecast.currentPace} <span style={{ fontSize: '0.7rem' }}>topics/day</span></div>
-                </div>
-                <div className={styles.forecastStatDivider} />
-                <div className={styles.forecastStat}>
-                  <div className={styles.forecastStatLabel}>Remaining</div>
-                  <div className={styles.forecastStatValue}>{forecast.remainingTopics} <span style={{ fontSize: '0.7rem' }}>topics</span></div>
+                <div style={{ position: 'absolute', right: '-10%', top: '-10%', opacity: 0.1 }}>
+                  <TrendingUp size={160} />
                 </div>
               </div>
-              <div className={styles.dailyGoalCheck}>
-                <div className={styles.goalTitle}>Today's Goal ({forecast.dailyTargets.total}h)</div>
-                <div className={styles.goalProgressLine}>
-                  <div className={styles.goalProgressFill} style={{ width: `${Math.min(100, (forecast.todayHours.total / forecast.dailyTargets.total) * 100)}%` }} />
-                </div>
-                <div className={styles.goalBreakdown}>
-                  <span>Q: {forecast.todayHours.quants}/{forecast.dailyTargets.quants}h</span>
-                  <span>D: {forecast.todayHours.dilr}/{forecast.dailyTargets.dilr}h</span>
-                  <span>V: {forecast.todayHours.verbal}/{forecast.dailyTargets.verbal}h</span>
-                </div>
-              </div>
+
+              {/* Primary: CAT Countdown */}
+              {(() => {
+                const catExam = UPCOMING_EXAMS[0];
+                const dLeft = differenceInDays(catExam.date, new Date());
+                return (
+                  <div className={`${styles.largeCard} ${styles.largeCardSecondary}`}>
+                    <div style={{ position: 'relative', zIndex: 2 }}>
+                      <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--accent-primary)', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '0.75rem' }}>{catExam.name} COUNTDOWN</div>
+                      <div className={styles.countdownFlex}>
+                        <div>
+                          <div className={styles.countdownLabel}>CRITICAL</div>
+                          <div className={styles.countdownSubtext}>Target: 99.5+ Percentile</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div className={styles.countdownValue}>{dLeft}</div>
+                          <div className={styles.countdownValueSub}>Days Left</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ position: 'absolute', right: '5%', bottom: '-10%', color: 'var(--accent-primary)', opacity: 0.03 }}>
+                      <Target size={120} />
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
-          )}
+
+            {/* Secondary Exams Row */}
+            <div className={styles.smallCardsGrid}>
+              {UPCOMING_EXAMS.slice(1).map(exam => {
+                const dLeft = differenceInDays(exam.date, new Date());
+                return (
+                  <div key={exam.id} style={{ background: 'white', padding: '1.5rem', borderRadius: '20px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem', transition: 'transform 0.2s', cursor: 'pointer' }} onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-4px)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{exam.name.split(' ')[0]}</span>
+                      <span style={{ fontSize: '0.6rem', fontWeight: 900, color: exam.color, padding: '2px 8px', background: `${exam.color}10`, borderRadius: '10px' }}>{exam.importance}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem' }}>
+                      <span style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--text-main)' }}>{dLeft < 0 ? 'Done' : dLeft}</span>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)' }}>days</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
 
           <div className={styles.dashboardGrid}>
             <div className={styles.dashboardMainCol}>
-              {recommendation && (
-                <div className={styles.missionCard}>
-                  <div className={styles.missionHeader}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <Flame size={20} color="var(--accent-danger)" />
-                      <span>DAILY MISSION</span>
+              <div className={styles.missionCard} style={{ padding: 0, overflow: 'hidden' }}>
+                <div className={styles.missionHeader} style={{ borderBottom: '1px solid var(--border-color)', padding: '1.25rem 1.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ background: 'var(--accent-primary)', color: 'white', padding: '0.4rem', borderRadius: '8px', display: 'flex' }}>
+                      <Target size={18} />
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <input 
-                        type="date" 
-                        value={previewDate} 
-                        onChange={(e) => setPreviewDate(e.target.value)}
-                        style={{ 
-                          padding: '0.25rem 0.5rem', 
-                          borderRadius: '6px', 
-                          border: '1px solid var(--border-color)',
-                          fontSize: '0.75rem',
-                          background: 'white',
-                          fontWeight: 600,
-                          cursor: 'pointer'
-                        }}
-                      />
-                      {previewDate !== format(new Date(), 'yyyy-MM-dd') && (
-                        <button 
-                          onClick={() => setPreviewDate(format(new Date(), 'yyyy-MM-dd'))}
-                          style={{ 
-                            fontSize: '0.7rem', 
-                            padding: '0.25rem 0.5rem', 
-                            background: 'var(--accent-primary)', 
-                            color: 'white', 
-                            border: 'none', 
-                            borderRadius: '4px',
-                            fontWeight: 700,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Today
-                        </button>
-                      )}
-                    </div>
+                    <span style={{ fontWeight: 800, fontSize: '0.85rem', letterSpacing: '0.5px' }}>DAILY STUDY MISSIONS</span>
                   </div>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                    {(Array.isArray(recommendation) ? recommendation : [recommendation]).map((rec, idx) => (
-                      <div key={idx} className={styles.missionItem} style={{ borderBottom: idx === (Array.isArray(recommendation) ? recommendation.length - 1 : 0) ? 'none' : '1px solid var(--border-color)', paddingBottom: idx === (Array.isArray(recommendation) ? recommendation.length - 1 : 0) ? 0 : '1.5rem' }}>
-                        <div className={styles.missionContent}>
-                          <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>{rec.topic}</h3>
-                          <p style={{ fontSize: '0.85rem', marginBottom: '1rem' }}>{rec.task}</p>
-                          <div className={styles.missionMeta}>
-                            {!rec.isWeeklyReview ? (
-                              <>
-                                <span className={styles.badgeQuants} style={{ background: rec.section === 'dilr' ? 'rgba(6, 182, 212, 0.1)' : 'rgba(139, 92, 246, 0.1)', color: rec.section === 'dilr' ? 'var(--accent-secondary)' : 'var(--accent-primary)' }}>
-                                  {rec.section.toUpperCase()}
-                                </span>
-                                <span className={styles.importanceBadge} style={{ background: 'rgba(0,0,0,0.05)', color: 'var(--text-main)' }}>{rec.category}</span>
-                              </>
-                            ) : (
-                              <span className={styles.badgeVerbal}>WEEKLY SUMMARY</span>
-                            )}
-                          </div>
-                        </div>
-                        {!rec.isWeeklyReview ? (
-                          <button className={styles.missionStartBtn} onClick={() => {
-                            setActiveSection(rec.section);
-                            setActiveTopics([rec.actualTopic || rec.topic]);
-                            setModalState('setup');
-                          }}>Start Studying This Topic</button>
-                        ) : (
-                          <button className={styles.missionStartBtn} onClick={() => setModalState('setup')}>Start Weekend Practice Session</button>
-                        )}
-                      </div>
-                    ))}
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#10B981', background: 'rgba(16, 185, 129, 0.1)', padding: '0.4rem 0.75rem', borderRadius: '20px' }}>
+                    AI GENERATED
                   </div>
                 </div>
-              )}
 
-              <section className={styles.section}><h2 className={styles.sectionTitle}><BarChart3 size={24} color="#8B5CF6" /> Study Consistency (Last 7 Days)</h2><div className={styles.chartContainer}><ResponsiveContainer width="100%" height="100%"><AreaChart data={generateChartData()} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}><defs><linearGradient id="colorHours" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.8}/><stop offset="95%" stopColor="#8B5CF6" stopOpacity={0}/></linearGradient></defs><CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} /><XAxis dataKey="name" stroke="#9CA3AF" tick={{fill: '#9CA3AF'}} tickLine={false} axisLine={false} /><YAxis stroke="#9CA3AF" tick={{fill: '#9CA3AF'}} tickLine={false} axisLine={false} /><Tooltip content={<CustomTooltip />} /><Area type="monotone" dataKey="hours" stroke="#8B5CF6" strokeWidth={3} fillOpacity={1} fill="url(#colorHours)" /></AreaChart></ResponsiveContainer></div></section>
-              <section className={styles.section}><h2 className={styles.sectionTitle}><CheckCircle2 size={24} color="#10B981" /> 60-Day Activity Log</h2><div className={styles.consistencyGrid}>{generateConsistencyBoxes()}</div></section>
+                <div className={styles.missionsGrid}>
+                  {/* Quants Mission */}
+                  {(() => {
+                    const quantsPlans = [ALGEBRA_PLAN, ARITHMETIC_PLAN, GEOMETRY_PLAN, MODERN_MATHS_PLAN];
+                    const recommended = getRecommendedTopic(quantsPlans);
+                    const isDone = dailyTasks.some(t => t.date === format(new Date(), 'yyyy-MM-dd') && t.taskName === 'quants_mission' && t.completed);
+                    
+                    // Calculate Day X of Y
+                    let dayInfo = '';
+                    if (recommended) {
+                      const today = new Date();
+                      const taskStart = new Date(today.getFullYear(), recommended.startMonth, recommended.startDay);
+                      const dayOfTask = differenceInDays(today, taskStart) + 1;
+                      dayInfo = `Day ${dayOfTask} of ${recommended.days}`;
+                    }
+
+                    return (
+                      <div className={styles.missionItem} style={{ opacity: isDone ? 0.6 : 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-primary)' }}></div>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 900, color: 'var(--accent-primary)', textTransform: 'uppercase' }}>Quantitative Aptitude</span>
+                          </div>
+                          <button 
+                            onClick={() => handleToggleMission('quants_mission')}
+                            style={{ 
+                              background: isDone ? '#10B981' : 'rgba(0,0,0,0.04)',
+                              border: `1px solid ${isDone ? '#10B981' : 'var(--border-color)'}`,
+                              color: isDone ? 'white' : 'var(--text-muted)',
+                              borderRadius: '8px',
+                              width: '32px',
+                              height: '32px',
+                              padding: '0',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                              boxShadow: isDone ? '0 0 15px rgba(16, 185, 129, 0.3)' : 'none'
+                            }}
+                          >
+                            {isDone && <Check size={16} strokeWidth={4} />}
+                          </button>
+                        </div>
+                        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '0.75rem', color: 'var(--text-main)', textDecoration: isDone ? 'line-through' : 'none' }}>
+                          {recommended ? recommended.name : 'Focus on Arithmetic'}
+                        </h3>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: '1rem', overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+                          {recommended ? `Category: ${recommended.topic}` : 'Review mixed arithmetic problems to build speed.'}
+                        </p>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                          <div className={styles.topicChip} style={{ padding: '2px 8px', fontSize: '0.7rem', width: 'max-content' }}><Clock size={12} /> {recommended?.days ? `${recommended.days * 2}h Total` : '2h Target'}</div>
+                          {dayInfo && <div className={styles.topicChip} style={{ padding: '2px 8px', fontSize: '0.7rem', color: 'var(--accent-primary)', borderColor: 'var(--accent-primary)', background: 'rgba(139, 92, 246, 0.05)', width: 'max-content' }}>{dayInfo}</div>}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* LRDI Mission */}
+                  {(() => {
+                    const lrdiPlans = [LR_PLAN, DI_PLAN];
+                    const recommended = getRecommendedTopic(lrdiPlans);
+                    const isDone = dailyTasks.some(t => t.date === format(new Date(), 'yyyy-MM-dd') && t.taskName === 'lrdi_mission' && t.completed);
+                    
+                    // Calculate Day X of Y
+                    let dayInfo = '';
+                    if (recommended) {
+                      const today = new Date();
+                      const taskStart = new Date(today.getFullYear(), recommended.startMonth, recommended.startDay);
+                      const dayOfTask = differenceInDays(today, taskStart) + 1;
+                      dayInfo = `Day ${dayOfTask} of ${recommended.days}`;
+                    }
+
+                    return (
+                      <div className={styles.missionItem} style={{ opacity: isDone ? 0.6 : 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#14B8A6' }}></div>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 900, color: '#14B8A6', textTransform: 'uppercase' }}>LRDI Strategy</span>
+                          </div>
+                          <button 
+                            onClick={() => handleToggleMission('lrdi_mission')}
+                            style={{ 
+                              background: isDone ? '#10B981' : 'rgba(0,0,0,0.04)',
+                              border: `1px solid ${isDone ? '#10B981' : 'var(--border-color)'}`,
+                              color: isDone ? 'white' : 'var(--text-muted)',
+                              borderRadius: '8px',
+                              width: '32px',
+                              height: '32px',
+                              padding: '0',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                              boxShadow: isDone ? '0 0 15px rgba(16, 185, 129, 0.3)' : 'none'
+                            }}
+                          >
+                            {isDone && <Check size={16} strokeWidth={4} />}
+                          </button>
+                        </div>
+                        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '0.75rem', color: 'var(--text-main)', textDecoration: isDone ? 'line-through' : 'none' }}>
+                          {recommended ? recommended.name : 'LR Fundamentals'}
+                        </h3>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: '1rem', overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+                          {recommended ? `Category: ${recommended.topic}` : 'Solve 3 sets of intermediate DILR puzzles.'}
+                        </p>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                          <div className={styles.topicChip} style={{ padding: '2px 8px', fontSize: '0.7rem', width: 'max-content' }}><Clock size={12} /> {recommended?.days ? `${Math.round(recommended.days * 1.5)}h Total` : '1.5h Target'}</div>
+                          {dayInfo && <div className={styles.topicChip} style={{ padding: '2px 8px', fontSize: '0.7rem', color: '#14B8A6', borderColor: '#14B8A6', background: 'rgba(20, 184, 166, 0.05)', width: 'max-content' }}>{dayInfo}</div>}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Newspaper Mission */}
+                  {(() => {
+                    const isDone = dailyTasks.some(t => t.date === format(new Date(), 'yyyy-MM-dd') && t.taskName === 'newspaper_mission' && t.completed);
+                    
+                    return (
+                      <div className={styles.missionItem} style={{ opacity: isDone ? 0.6 : 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#F59E0B' }}></div>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 900, color: '#F59E0B', textTransform: 'uppercase' }}>Daily Reading</span>
+                          </div>
+                          <button 
+                            onClick={() => handleToggleMission('newspaper_mission')}
+                            style={{ 
+                              background: isDone ? '#10B981' : 'rgba(0,0,0,0.04)',
+                              border: `1px solid ${isDone ? '#10B981' : 'var(--border-color)'}`,
+                              color: isDone ? 'white' : 'var(--text-muted)',
+                              borderRadius: '8px',
+                              width: '32px',
+                              height: '32px',
+                              padding: '0',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                              boxShadow: isDone ? '0 0 15px rgba(16, 185, 129, 0.3)' : 'none'
+                            }}
+                          >
+                            {isDone && <Check size={16} strokeWidth={4} />}
+                          </button>
+                        </div>
+                        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '0.75rem', color: 'var(--text-main)', textDecoration: isDone ? 'line-through' : 'none' }}>
+                          Newspaper Reading
+                        </h3>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: '1rem', overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+                          Read 2 Editorials from The Hindu or Indian Express. Focus on summarizing the main argument.
+                        </p>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                          <div className={styles.topicChip} style={{ padding: '2px 8px', fontSize: '0.7rem', width: 'max-content' }}><Clock size={12} /> 45m Target</div>
+                          <div className={styles.topicChip} style={{ borderColor: '#F59E0B', color: '#F59E0B', background: 'rgba(245, 158, 11, 0.05)', padding: '2px 8px', fontSize: '0.7rem', width: 'max-content' }}>VARC Prep</div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Sudoku Mission */}
+                  <div className={styles.missionItem} style={{ opacity: isSudokuDoneToday ? 0.6 : 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#EF4444' }}></div>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 900, color: '#EF4444', textTransform: 'uppercase' }}>Mental Warmup</span>
+                      </div>
+                      <button 
+                        onClick={handleToggleSudoku}
+                        style={{ 
+                          background: isSudokuDoneToday ? '#10B981' : 'rgba(0,0,0,0.04)',
+                          border: `1px solid ${isSudokuDoneToday ? '#10B981' : 'var(--border-color)'}`,
+                          color: isSudokuDoneToday ? 'white' : 'var(--text-muted)',
+                          borderRadius: '8px',
+                          width: '32px',
+                          height: '32px',
+                          padding: '0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                          boxShadow: isSudokuDoneToday ? '0 0 15px rgba(16, 185, 129, 0.3)' : 'none'
+                        }}
+                      >
+                        {isSudokuDoneToday && <Check size={16} strokeWidth={4} />}
+                      </button>
+                    </div>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '0.75rem', color: 'var(--text-main)', textDecoration: isSudokuDoneToday ? 'line-through' : 'none' }}>
+                      Sudoku Challenge
+                    </h3>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: '1rem', overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+                      Sharpen your logic and pattern recognition for DILR. Play one medium or hard Sudoku.
+                    </p>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                      <div className={styles.topicChip} style={{ padding: '2px 8px', fontSize: '0.7rem', width: 'max-content' }}><Clock size={12} /> 15m Target</div>
+                      <div className={styles.topicChip} style={{ borderColor: '#EF4444', color: '#EF4444', background: 'rgba(239, 68, 68, 0.05)', padding: '2px 8px', fontSize: '0.7rem', width: 'max-content' }}>Logic</div>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ padding: '1.25rem 1.5rem', background: '#F8FAFC', borderTop: '1px solid var(--border-color)' }}>
+                  <button className={styles.missionStartBtn} onClick={() => setModalState('setup')} style={{ width: '100%', margin: 0, padding: '1rem', fontSize: '1rem' }}>
+                    <Play size={20} fill="currentColor" /> Start Today's Focus
+                  </button>
+                </div>
+              </div>
+
+              <section className={styles.section}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <h2 className={styles.sectionTitle} style={{ marginBottom: 0 }}><FileText size={24} color="#8B5CF6" /> Formula Vault</h2>
+                  <button 
+                    className={styles.uploadBtn}
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                  >
+                    <FileUp size={18} />
+                    {isUploading ? 'Uploading...' : 'Upload PDF'}
+                  </button>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleFileUpload} 
+                    accept="application/pdf" 
+                    style={{ display: 'none' }} 
+                  />
+                </div>
+                
+                <div className={styles.notesGrid}>
+                  {resourceNotes.length === 0 ? (
+                    <div className={styles.emptyNotes}>
+                      No formula sheets uploaded yet. Upload your handwritten notes to access them anywhere.
+                    </div>
+                  ) : (
+                    resourceNotes.map(note => (
+                      <div key={note.id} className={styles.noteCard}>
+                        <div className={styles.noteInfo}>
+                          <div className={styles.noteIcon}>
+                            <FileText size={20} />
+                          </div>
+                          <div className={styles.noteName} title={note.name}>{note.name}</div>
+                        </div>
+                        <div className={styles.noteActions}>
+                          <a 
+                            href={note.content} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className={styles.noteActionBtn}
+                            title="View PDF"
+                          >
+                            <ExternalLink size={16} />
+                          </a>
+                          <button 
+                            className={`${styles.noteActionBtn} ${styles.noteDeleteBtn}`}
+                            onClick={() => {
+                              if (confirm("Delete this formula sheet?")) handleDeleteNote(note.id);
+                            }}
+                            title="Delete"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </section>
             </div>
             
             <div className={styles.dashboardSideCol}>
-              <section className={styles.section}>
-                <h2 className={styles.sectionTitle}><CheckCircle2 size={24} color="#10B981" /> Daily Mental Warmup</h2>
-                <div style={{ padding: '1rem', background: 'var(--bg-main)', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                     <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(139, 92, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                       <TrendingUp size={20} color="#8B5CF6" />
-                     </div>
-                     <div>
-                       <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>Sudoku Challenge</div>
-                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Sharpen your logic for DILR</div>
-                     </div>
-                   </div>
-                   <input 
-                     type="checkbox" 
-                     checked={isSudokuDoneToday} 
-                     onChange={handleToggleSudoku}
-                     style={{ width: '24px', height: '24px', cursor: 'pointer' }} 
-                   />
-                </div>
-              </section>
 
-              <section className={styles.section}><h2 className={styles.sectionTitle}><Info size={24} color="#F59E0B" /> CAT Exam Pattern</h2><div className={styles.examPatternGrid}><div className={styles.patternCard}><div className={styles.patternLabel}>Total Time</div><div className={styles.patternValue}>120 Mins</div></div><div className={styles.patternCard}><div className={styles.patternLabel}>Questions</div><div className={styles.patternValue}>68 Qs</div></div><div className={styles.patternCard}><div className={styles.patternLabel}>Total Marks</div><div className={styles.patternValue}>204 Marks</div></div><div className={styles.patternCard}><div className={styles.patternLabel}>Slots</div><div className={styles.patternValue}>3 Slots</div></div></div>
-                  <div className={styles.weightageHeader}><TrendingUp size={20} color="#8B5CF6" /><span>Quants Topic Weightage (Recent Trends)</span></div>
-                  <div style={{ overflowX: 'auto', width: '100%' }}>
-                    <table className={styles.weightageTable}><thead><tr><th>Topic Group</th><th>Avg. Questions</th></tr></thead><tbody><tr><td>Arithmetic (Avg, Ratio, P&L, TSD)</td><td>8 - 10 Qs</td></tr><tr><td>Algebra (Equations, Log, Progressions)</td><td>6 - 8 Qs</td></tr><tr><td>Geometry & Mensuration</td><td>3 - 4 Qs</td></tr><tr><td>Number System</td><td>2 - 3 Qs</td></tr><tr><td>Modern Maths (P&C, Prob)</td><td>1 - 2 Qs</td></tr></tbody></table>
-                  </div>
-                  <div style={{ overflowX: 'auto', width: '100%' }}>
-                    <table className={styles.patternTable}><thead><tr><th>Section</th><th>Questions</th><th>Marking (MCQ)</th><th>Marking (TITA)</th></tr></thead><tbody><tr><td>VARC</td><td>24 Qs</td><td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`}>-1</span></td><td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`} style={{ background: 'rgba(0,0,0,0.05)', color: 'var(--text-muted)' }}>0</span></td></tr><tr><td>DILR</td><td>22 Qs</td><td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`}>-1</span></td><td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`} style={{ background: 'rgba(0,0,0,0.05)', color: 'var(--text-muted)' }}>0</span></td></tr><tr><td>Quants</td><td>22 Qs</td><td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`}>-1</span></td><td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`} style={{ background: 'rgba(0,0,0,0.05)', color: 'var(--text-muted)' }}>0</span></td></tr></tbody></table>
-                  </div>
+              <section className={styles.section}>
+                <h2 className={styles.sectionTitle}><Info size={24} color="#06B6D4" /> Exam Pattern Ref</h2>
+                <div style={{ padding: '1.5rem', background: 'var(--bg-main)', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
+                  <table className={styles.patternTable}>
+                    <thead>
+                      <tr>
+                        <th>Section</th>
+                        <th>Questions</th>
+                        <th>Marking (MCQ)</th>
+                        <th>Marking (TITA)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>VARC</td>
+                        <td>24 Qs</td>
+                        <td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`}>-1</span></td>
+                        <td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`} style={{ background: 'rgba(0,0,0,0.05)', color: 'var(--text-muted)' }}>0</span></td>
+                      </tr>
+                      <tr>
+                        <td>DILR</td>
+                        <td>22 Qs</td>
+                        <td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`}>-1</span></td>
+                        <td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`} style={{ background: 'rgba(0,0,0,0.05)', color: 'var(--text-muted)' }}>0</span></td>
+                      </tr>
+                      <tr>
+                        <td>Quants</td>
+                        <td>22 Qs</td>
+                        <td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`}>-1</span></td>
+                        <td><span className={`${styles.markingBadge} ${styles.markingPos}`}>+3</span> <span className={`${styles.markingBadge} ${styles.markingNeg}`} style={{ background: 'rgba(0,0,0,0.05)', color: 'var(--text-muted)' }}>0</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </section>
             </div>
           </div>
@@ -1240,7 +2150,39 @@ export default function Dashboard() {
 
       {activeTab === 'analytics' && (
         <div className={styles.analyticsView}>
+          <div className={styles.grid}>
+            <div className={`${styles.card} ${styles.cardPrimary}`}><div className={styles.cardHeader}><span className={styles.cardTitle}>Total Study Time</span><div className={`${styles.cardIcon} ${styles.cardIconPrimary}`}><Clock size={20} /></div></div><div className={styles.cardValue}>{totalStudyTime.toFixed(1)}h</div><div className={styles.cardSubtext}>Lifetime hours logged</div></div>
+            <div className={`${styles.card} ${styles.cardSecondary}`}><div className={styles.cardHeader}><span className={styles.cardTitle}>Concepts Mastered</span><div className={`${styles.cardIcon} ${styles.cardIconSecondary}`}><BookOpen size={20} /></div></div><div className={styles.cardValue}>{totalConcepts}</div><div className={styles.cardSubtext}>Key topics understood</div></div>
+            <div className={`${styles.card} ${styles.cardTertiary}`}><div className={styles.cardHeader}><span className={styles.cardTitle}>Practice Qs Done</span><div className={`${styles.cardIcon} ${styles.cardIconTertiary}`}><Target size={20} /></div></div><div className={styles.cardValue}>{totalQuestions}</div><div className={styles.cardSubtext}>Problems solved</div></div>
+            <div className={`${styles.card} ${styles.cardSuccess}`}><div className={styles.cardHeader}><span className={styles.cardTitle}>{phaseInfo.metricName}</span><div className={`${styles.cardIcon} ${styles.cardIconSuccess}`}><Target size={20} /></div></div><div className={styles.cardValue}>{phaseInfo.metricValue}</div><div className={styles.cardSubtext}>{phaseInfo.name}</div></div>
+            <div className={`${styles.card} ${styles.cardSuccess}`} style={{ background: 'var(--bg-main)', border: '1px solid var(--border-color)' }}><div className={styles.cardHeader}><span className={styles.cardTitle}>Current Streak</span><div className={`${styles.cardIcon} ${styles.cardIconSuccess}`}><Flame size={20} /></div></div><div className={styles.cardValue}>{calculateStreak()} Days</div><div className={styles.cardSubtext}>Keep going!</div></div>
+          </div>
           <div className={styles.analyticsGrid}>
+            <div className={styles.analyticsCard}>
+              <h2 className={styles.sectionTitle}><BarChart3 size={24} color="#8B5CF6" /> Study Consistency (Last 7 Days)</h2>
+              <div className={styles.chartContainer}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={generateChartData()} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorHours" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.8}/><stop offset="95%" stopColor="#8B5CF6" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} />
+                    <XAxis dataKey="name" stroke="#9CA3AF" tick={{fill: '#9CA3AF'}} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#9CA3AF" tick={{fill: '#9CA3AF'}} tickLine={false} axisLine={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Area type="monotone" dataKey="hours" stroke="#8B5CF6" strokeWidth={3} fillOpacity={1} fill="url(#colorHours)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            
+            <div className={styles.analyticsCard}>
+              <h2 className={styles.sectionTitle}><CheckCircle2 size={24} color="#10B981" /> 60-Day Activity Log</h2>
+              <div className={styles.consistencyGrid}>{generateConsistencyBoxes()}</div>
+            </div>
+            
             <div className={styles.analyticsCard}><h2 className={styles.sectionTitle}><BarChart3 size={24} color="#8B5CF6" /> Sectional Breakdown</h2><div style={{ height: '300px', width: '100%' }}><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={generatePieData()} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">{generatePieData().map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}</Pie><Tooltip content={<CustomTooltip />} /><Legend verticalAlign="bottom" height={36}/></PieChart></ResponsiveContainer></div></div>
             <div className={styles.analyticsCard}><h2 className={styles.sectionTitle}><TrendingUp size={24} color="#10B981" /> Daily Progress (14 Days)</h2><div style={{ height: '300px', width: '100%' }}><ResponsiveContainer width="100%" height="100%"><BarChart data={generateDetailedDailyData()}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-color)" /><XAxis dataKey="name" fontSize={10} axisLine={false} tickLine={false} /><YAxis axisLine={false} tickLine={false} /><Tooltip content={<CustomTooltip />} /><Legend /><Bar dataKey="Quants" stackId="a" fill="#8B5CF6" /><Bar dataKey="Verbal" stackId="a" fill="#10B981" /><Bar dataKey="DILR" stackId="a" fill="#06B6D4" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div></div>
             <div className={styles.analyticsCard}>
@@ -1267,6 +2209,61 @@ export default function Dashboard() {
                 })}
               </div>
               <p style={{ marginTop: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Sudoku improves your logic and number-crunching speed, which is vital for the DILR and Quants sections.</p>
+            </div>
+
+            <div className={styles.analyticsCard}>
+              <h2 className={styles.sectionTitle}><CheckCircle2 size={24} color="#10B981" /> Study Missions Consistency (30 Days)</h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '1rem' }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--accent-primary)', textTransform: 'uppercase' }}>Quants Missions</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>{dailyTasks.filter(t => t.taskName === 'quants_mission' && t.completed).length} Completed</span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {Array.from({ length: 30 }).map((_, i) => {
+                      const d = subDays(new Date(), 29 - i);
+                      const dateStr = format(d, 'yyyy-MM-dd');
+                      const isDone = dailyTasks.some(t => t.date === dateStr && t.taskName === 'quants_mission' && t.completed);
+                      return (
+                        <div key={i} title={format(d, 'MMM dd')} style={{ width: '18px', height: '18px', borderRadius: '4px', background: isDone ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.02)' }} />
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#14B8A6', textTransform: 'uppercase' }}>LRDI Missions</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>{dailyTasks.filter(t => t.taskName === 'lrdi_mission' && t.completed).length} Completed</span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {Array.from({ length: 30 }).map((_, i) => {
+                      const d = subDays(new Date(), 29 - i);
+                      const dateStr = format(d, 'yyyy-MM-dd');
+                      const isDone = dailyTasks.some(t => t.date === dateStr && t.taskName === 'lrdi_mission' && t.completed);
+                      return (
+                        <div key={i} title={format(d, 'MMM dd')} style={{ width: '18px', height: '18px', borderRadius: '4px', background: isDone ? '#14B8A6' : 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.02)' }} />
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#F59E0B', textTransform: 'uppercase' }}>Newspaper Reading</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>{dailyTasks.filter(t => t.taskName === 'newspaper_mission' && t.completed).length} Completed</span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {Array.from({ length: 30 }).map((_, i) => {
+                      const d = subDays(new Date(), 29 - i);
+                      const dateStr = format(d, 'yyyy-MM-dd');
+                      const isDone = dailyTasks.some(t => t.date === dateStr && t.taskName === 'newspaper_mission' && t.completed);
+                      return (
+                        <div key={i} title={format(d, 'MMM dd')} style={{ width: '18px', height: '18px', borderRadius: '4px', background: isDone ? '#F59E0B' : 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.02)' }} />
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+              <p style={{ marginTop: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Daily missions are designed to build sectional consistency. Tracking your streaks helps maintain momentum.</p>
             </div>
 
             <div className={styles.analyticsCard} style={{ gridColumn: '1 / -1', marginTop: '1rem' }}>
@@ -1331,7 +2328,7 @@ export default function Dashboard() {
             <div style={{ overflowX: 'auto' }}>
               <table className={styles.historyTable}>
                 <thead><tr><th>Date</th><th>Section</th><th>Type</th><th>Time Spent</th><th>Questions</th><th>Mastery</th></tr></thead>
-                <tbody>{sessions.length > 0 ? sessions.map((session) => (<tr key={session.id}><td><div className={styles.sessionDate}>{format(new Date(session.date), 'MMM dd, yyyy')}</div><div style={{ fontSize: '0.7rem', color: '#9CA3AF' }}>{format(new Date(session.date), 'hh:mm a')}</div></td><td><span className={`${styles.sessionBadge} ${session.topic === 'quants' ? styles.badgeQuants : session.topic === 'verbal' ? styles.badgeVerbal : styles.badgeDILR}`}>{session.topic.toUpperCase()}</span></td><td>{session.isPractice ? <span style={{ color: 'var(--accent-primary)', fontSize: '0.7rem', fontWeight: 700, background: 'rgba(139, 92, 246, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>PRACTICE</span> : <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem', border: '1px solid var(--border-color)', padding: '2px 6px', borderRadius: '4px' }}>LEARNING</span>}</td><td style={{ fontWeight: 600 }}>{session.timeSpent.toFixed(2)}h</td><td>{session.questionsDone} Qs</td><td>{session.conceptMastered ? (<span style={{ color: '#10B981', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', fontWeight: 600 }}><CheckCircle2 size={14} /> Mastered</span>) : '-'}</td></tr>)) : (<tr><td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>No sessions logged yet. Start studying to see your history!</td></tr>)}</tbody>
+                <tbody>{sessions.length > 0 ? sessions.map((session) => (<tr key={session.id}><td><div className={styles.sessionDate}>{format(new Date(session.date), 'MMM dd, yyyy')}</div><div style={{ fontSize: '0.7rem', color: '#9CA3AF' }}>{format(new Date(session.date), 'hh:mm a')}</div></td><td><span className={`${styles.sessionBadge} ${session.topic === 'quants' ? styles.badgeQuants : session.topic === 'verbal' ? styles.badgeVerbal : session.topic === 'dilr' ? styles.badgeDILR : ''}`}>{session.topic.toUpperCase()}</span></td><td>{session.isPractice ? <span style={{ color: 'var(--accent-primary)', fontSize: '0.7rem', fontWeight: 700, background: 'rgba(139, 92, 246, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>PRACTICE</span> : <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem', border: '1px solid var(--border-color)', padding: '2px 6px', borderRadius: '4px' }}>LEARNING</span>}</td><td style={{ fontWeight: 600 }}>{session.timeSpent.toFixed(2)}h</td><td>{session.questionsDone} Qs</td><td>{session.conceptMastered ? (<span style={{ color: '#10B981', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', fontWeight: 600 }}><CheckCircle2 size={14} /> Mastered</span>) : '-'}</td></tr>)) : (<tr><td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>No sessions logged yet. Start studying to see your history!</td></tr>)}</tbody>
               </table>
             </div>
           </section>
@@ -1359,7 +2356,6 @@ export default function Dashboard() {
             </div>
 
             <div className={styles.timelineTracks}>
-              {/* Overall Phases */}
               <div className={styles.timelineTrackRow}>
                 <div className={styles.trackLabel}>TIMELINE</div>
                 <div className={styles.trackCells}>
@@ -1375,7 +2371,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Detailed Track for current Phase (Only if in Phase 1) */}
               {syllabusPhase === 1 && (
                 <>
                   <div className={styles.timelineTrackRow} style={{ marginTop: '0.5rem' }}>
@@ -1441,8 +2436,38 @@ export default function Dashboard() {
                       <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>{item.coveredTopics} of {item.totalTopicsCount} topics covered</p>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
+                  <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
                     <div style={{ fontSize: '1.5rem', fontWeight: 800, color: item.color }}>{item.progress}%</div>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      {item.id === 'quants' && (
+                        <>
+                          <button 
+                            onClick={() => {
+                              setSelectedCategory(item.id);
+                              setModalState('topic_details');
+                              setModalView('category_gallery');
+                            }}
+                            style={{ background: 'rgba(139, 92, 246, 0.1)', color: 'var(--accent-primary)', border: 'none', padding: '0.4rem 0.8rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s ease' }}
+                            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)'}
+                            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(139, 92, 246, 0.1)'}
+                          >
+                            View Tricks
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setSelectedCategory(item.id);
+                              setModalState('topic_details');
+                              setModalView('category_questions_gallery');
+                            }}
+                            style={{ background: 'rgba(6, 182, 212, 0.1)', color: 'var(--accent-secondary)', border: 'none', padding: '0.4rem 0.8rem', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s ease' }}
+                            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(6, 182, 212, 0.2)'}
+                            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(6, 182, 212, 0.1)'}
+                          >
+                            View Questions
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1454,7 +2479,7 @@ export default function Dashboard() {
                     
                     const filteredTopics = cat.topics.filter(topic => {
                       const matchesSearch = topic.toLowerCase().includes(syllabusSearch.toLowerCase());
-                      const isDone = sessions.some(s => s.topic === item.id && (s.subTopic === topic || (s.subTopics && s.subTopics.includes(topic))));
+                      const isDone = sessions.some(s => s.topic === item.id && (s.subTopics && s.subTopics.includes(topic)));
                       if (coverageFilter === 'covered') return matchesSearch && isDone;
                       if (coverageFilter === 'pending') return matchesSearch && !isDone;
                       return matchesSearch;
@@ -1462,8 +2487,8 @@ export default function Dashboard() {
                     if (filteredTopics.length === 0 && (syllabusSearch || coverageFilter !== 'all')) return null;
                     return (
                       <div key={cat.category} className={styles.syllabusCatGroup}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div className={styles.syllabusCatHeader}>
+                          <div className={styles.syllabusCatTitleGroup}>
                             <h4 className={styles.syllabusCatTitle}>{cat.category}</h4>
                             <span className={`${styles.importanceBadge} ${styles['importance' + cat.importance]}`}>
                               {cat.importance} Importance
@@ -1478,7 +2503,8 @@ export default function Dashboard() {
                                 background: isViewingTimeline ? 'var(--accent-primary)' : 'rgba(139, 92, 246, 0.05)', 
                                 color: isViewingTimeline ? 'white' : 'var(--accent-primary)',
                                 border: '1px solid rgba(139, 92, 246, 0.1)', fontWeight: 700, cursor: 'pointer',
-                                fontSize: '0.75rem', transition: 'all 0.2s'
+                                fontSize: '0.75rem', transition: 'all 0.2s',
+                                whiteSpace: 'nowrap'
                               }}
                             >
                               <Calendar size={14} />
@@ -1499,8 +2525,7 @@ export default function Dashboard() {
                                `${cat.category} Study Roadmap`}
                             </h5>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                              {cat.category === 'Algebra' || cat.category === 'Arithmetic' || cat.category === 'Geometry' || cat.category === 'Modern Maths' || cat.category === 'Logical Reasoning' || cat.category === 'Data Interpretation' ? (
-                                (cat.category === 'Algebra' ? ALGEBRA_PLAN : cat.category === 'Arithmetic' ? ARITHMETIC_PLAN : cat.category === 'Geometry' ? GEOMETRY_PLAN : cat.category === 'Modern Maths' ? MODERN_MATHS_PLAN : cat.category === 'Data Interpretation' ? DI_PLAN : LR_PLAN).map((plan, idx) => {
+                              {(cat.category === 'Algebra' ? ALGEBRA_PLAN : cat.category === 'Arithmetic' ? ARITHMETIC_PLAN : cat.category === 'Geometry' ? GEOMETRY_PLAN : cat.category === 'Modern Maths' ? MODERN_MATHS_PLAN : cat.category === 'Data Interpretation' ? DI_PLAN : LR_PLAN).map((plan, idx) => {
                                   const start = new Date(2026, plan.startMonth, plan.startDay);
                                   const end = addDays(start, plan.days - 1);
                                   const isToday = new Date() >= start && new Date() <= end;
@@ -1520,18 +2545,13 @@ export default function Dashboard() {
                                       </div>
                                     </div>
                                   );
-                                })
-                              ) : (
-                                <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', background: 'white', borderRadius: '8px', border: '1px dashed var(--border-color)' }}>
-                                  Detailed roadmap for {cat.category} is being finalized. Stay tuned!
-                                </div>
-                              )}
+                                })}
                             </div>
                           </div>
                         )}
                         <div className={styles.syllabusTopicGrid}>
                           {filteredTopics.map(topic => {
-                            const isDone = sessions.some(s => s.topic === item.id && (s.subTopic === topic || (s.subTopics && s.subTopics.includes(topic))));
+                            const isDone = sessions.some(s => s.topic === item.id && (s.subTopics && s.subTopics.includes(topic)));
                             return (<div key={topic} className={`${styles.topicChip} ${isDone ? styles.topicChipDone : ''}`} onClick={() => toggleTopicCompletion(item.id, topic)} style={{ cursor: 'pointer' }}>{isDone ? <CheckCircle2 size={14} /> : <div style={{ width: '14px', height: '14px', borderRadius: '50%', border: '1px solid #CBD5E1' }} />}{topic}</div>);
                           })}
                         </div>
@@ -1574,6 +2594,7 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
     </main>
   );
 }

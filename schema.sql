@@ -1,4 +1,4 @@
-CREATE TABLE sessions (
+CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY,
   date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   section TEXT NOT NULL,
@@ -10,10 +10,17 @@ CREATE TABLE sessions (
   topic_questions JSONB
 );
 
-CREATE TABLE daily_tasks (
+CREATE TABLE IF NOT EXISTS daily_tasks (
   id TEXT PRIMARY KEY,
   date DATE NOT NULL,
   task_name TEXT NOT NULL,
   completed BOOLEAN DEFAULT FALSE,
   UNIQUE(date, task_name)
+);
+
+CREATE TABLE IF NOT EXISTS resource_notes (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
