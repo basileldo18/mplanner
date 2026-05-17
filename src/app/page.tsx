@@ -31,7 +31,8 @@ import {
   ImageOff,
   Image,
   List,
-  Check
+  Check,
+  Send
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -222,10 +223,15 @@ export default function Dashboard() {
   useEffect(() => {
     setMounted(true);
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const currentYear = today.getFullYear();
     
     let catTarget = new Date(currentYear, 10, 29);
-    if (today > catTarget) catTarget = new Date(currentYear + 1, 10, 29);
+    catTarget.setHours(0, 0, 0, 0);
+    if (today > catTarget) {
+      catTarget = new Date(currentYear + 1, 10, 29);
+      catTarget.setHours(0, 0, 0, 0);
+    }
     setDaysLeft(differenceInDays(catTarget, today));
 
     const loadData = async () => {
@@ -259,20 +265,84 @@ export default function Dashboard() {
   }, [selectedSyllabusTopic]);
 
   const getRecommendedTopic = (plans: any[][]) => {
-    const today = new Date();
+    let today = new Date();
+    if (previewDate) {
+      const [y, m, d] = previewDate.split('-').map(Number);
+      today = new Date(y, m - 1, d);
+    }
+    today.setHours(0, 0, 0, 0);
     const currentYear = today.getFullYear();
     
     for (const plan of plans) {
       for (const task of plan) {
         const taskStart = new Date(currentYear, task.startMonth, task.startDay);
+        taskStart.setHours(0, 0, 0, 0);
         const taskEnd = addDays(taskStart, task.days - 1);
+        taskEnd.setHours(0, 0, 0, 0);
         
-        if (isSameDay(today, taskStart) || (today >= taskStart && today <= taskEnd)) {
+        if (today >= taskStart && today <= taskEnd) {
           return task;
         }
       }
     }
     return null;
+  };
+
+  const compressImage = (file: File, maxWidth = 1200, maxHeight = 1200, quality = 0.8): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      // If it's not an image, resolve with original reader
+      if (!file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (event) => resolve(event.target?.result as string);
+        reader.onerror = (err) => reject(err);
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new window.Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          // Calculate new dimensions keeping aspect ratio
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(event.target?.result as string); // fallback
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Convert canvas to compressed base64 JPEG
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(dataUrl);
+        };
+        img.onerror = () => {
+          resolve(event.target?.result as string); // fallback
+        };
+        img.src = event.target?.result as string;
+      };
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleShortcutUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -284,22 +354,19 @@ export default function Dashboard() {
 
     try {
       setIsUploading(true);
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64String = reader.result as string;
-        const newShortcut: TopicShortcut = {
-          id: crypto.randomUUID(),
-          topicName: selectedSyllabusTopic.topicName,
-          title: title || 'Untitled Trick',
-          imageData: base64String
-        };
-        await saveTopicShortcut(newShortcut);
-        setTopicShortcuts(prev => [newShortcut, ...prev]);
-        setIsUploading(false);
+      const base64String = await compressImage(file);
+      const newShortcut: TopicShortcut = {
+        id: crypto.randomUUID(),
+        topicName: selectedSyllabusTopic.topicName,
+        title: title || 'Untitled Trick',
+        imageData: base64String
       };
-      reader.readAsDataURL(file);
+      await saveTopicShortcut(newShortcut);
+      setTopicShortcuts(prev => [newShortcut, ...prev]);
+      setIsUploading(false);
     } catch (error) {
       console.error("Failed to upload shortcut", error);
+      alert("Failed to upload image. Please ensure it's a valid image file.");
       setIsUploading(false);
     }
   };
@@ -313,22 +380,19 @@ export default function Dashboard() {
 
     try {
       setIsUploading(true);
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64String = reader.result as string;
-        const newQuestion: ImportantQuestion = {
-          id: crypto.randomUUID(),
-          topicName: selectedSyllabusTopic.topicName,
-          title: title || 'Untitled Question',
-          imageData: base64String
-        };
-        await saveImportantQuestion(newQuestion);
-        setImportantQuestions(prev => [newQuestion, ...prev]);
-        setIsUploading(false);
+      const base64String = await compressImage(file);
+      const newQuestion: ImportantQuestion = {
+        id: crypto.randomUUID(),
+        topicName: selectedSyllabusTopic.topicName,
+        title: title || 'Untitled Question',
+        imageData: base64String
       };
-      reader.readAsDataURL(file);
+      await saveImportantQuestion(newQuestion);
+      setImportantQuestions(prev => [newQuestion, ...prev]);
+      setIsUploading(false);
     } catch (error) {
       console.error("Failed to upload question", error);
+      alert("Failed to upload image. Please ensure it's a valid image file.");
       setIsUploading(false);
     }
   };
@@ -427,7 +491,7 @@ export default function Dashboard() {
   };
 
   const handleToggleMission = async (missionName: string) => {
-    const today = format(new Date(), 'yyyy-MM-dd');
+    const today = previewDate || format(new Date(), 'yyyy-MM-dd');
     const existing = dailyTasks.find(t => t.date === today && t.taskName === missionName);
     const newState = !existing?.completed;
     
@@ -557,7 +621,7 @@ export default function Dashboard() {
   };
 
   const handleToggleSudoku = async () => {
-    const today = format(new Date(), 'yyyy-MM-dd');
+    const today = previewDate || format(new Date(), 'yyyy-MM-dd');
     const existing = dailyTasks.find(t => t.date === today && t.taskName === 'Sudoku');
     const newCompleted = !existing?.completed;
     
@@ -579,7 +643,7 @@ export default function Dashboard() {
     }
   };
 
-  const isSudokuDoneToday = dailyTasks.some(t => t.date === format(new Date(), 'yyyy-MM-dd') && t.taskName === 'Sudoku' && t.completed);
+  const isSudokuDoneToday = dailyTasks.some(t => t.date === (previewDate || format(new Date(), 'yyyy-MM-dd')) && t.taskName === 'Sudoku' && t.completed);
 
   const handleClearHistory = async () => {
     if (confirm("Are you sure you want to clear ALL study history? This action cannot be undone and will delete all data from the cloud.")) {
@@ -613,6 +677,49 @@ export default function Dashboard() {
     return streak;
   };
 
+  const calculateSubmissionStreak = () => {
+    const submittedTasks = dailyTasks.filter(t => t.taskName === 'day_submit' && t.completed);
+    if (submittedTasks.length === 0) return 0;
+    
+    // Extract unique dates that have been submitted and sort them descending
+    const submittedDates = [...new Set(submittedTasks.map(t => t.date))].sort((a, b) => b.localeCompare(a));
+    
+    let streak = 0;
+    let today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const latestSubmissionStr = submittedDates[0];
+    const [y, m, d] = latestSubmissionStr.split('-').map(Number);
+    const latestSubmissionDate = new Date(y, m - 1, d);
+    latestSubmissionDate.setHours(0, 0, 0, 0);
+    
+    // If the latest submission is older than 1 day from today, the streak is broken (0)
+    if (differenceInDays(today, latestSubmissionDate) > 1) return 0;
+    
+    for (let i = 0; i < submittedDates.length; i++) {
+      const currentSubDateStr = submittedDates[i];
+      const [cy, cm, cd] = currentSubDateStr.split('-').map(Number);
+      const currentSubDate = new Date(cy, cm - 1, cd);
+      currentSubDate.setHours(0, 0, 0, 0);
+      
+      if (i === 0) {
+        streak = 1;
+      } else {
+        const prevSubDateStr = submittedDates[i - 1];
+        const [py, pm, pd] = prevSubDateStr.split('-').map(Number);
+        const prevSubDate = new Date(py, pm - 1, pd);
+        prevSubDate.setHours(0, 0, 0, 0);
+        
+        if (differenceInDays(prevSubDate, currentSubDate) === 1) {
+          streak++;
+        } else {
+          break;
+        }
+      }
+    }
+    return streak;
+  };
+
   const calculateSyllabusProgress = () => {
     const totalTopics = ALL_SYLLABUS_TOPICS_SET.size;
     if (totalTopics === 0) return 0;
@@ -639,10 +746,14 @@ export default function Dashboard() {
 
   const getPhaseInfo = () => {
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const currentYear = today.getFullYear();
     const phase1End = new Date(currentYear, 6, 18);
+    phase1End.setHours(0, 0, 0, 0);
     const phase2End = addDays(phase1End, 45);
+    phase2End.setHours(0, 0, 0, 0);
     const phase3End = new Date(currentYear, 10, 29);
+    phase3End.setHours(0, 0, 0, 0);
     
     const phases = [
       { id: 1, name: "Phase 1: Syllabus", end: phase1End, icon: <BookOpen size={16} />, importance: 'Foundation - Critical' },
@@ -653,13 +764,21 @@ export default function Dashboard() {
     if (today <= phase1End) {
       return { id: 1, name: "Phase 1: Syllabus Coverage", targetDate: phase1End, daysLeft: differenceInDays(phase1End, today), metricName: "Topics Covered", metricValue: calculateSyllabusProgress() + "%", progress: calculateSyllabusProgress(), phases };
     } else if (today <= phase2End) {
-      const phase2Sessions = sessions.filter(s => new Date(s.date) > phase1End && new Date(s.date) <= phase2End);
+      const phase2Sessions = sessions.filter(s => {
+        const d = new Date(s.date);
+        d.setHours(0, 0, 0, 0);
+        return d > phase1End && d <= phase2End;
+      });
       const qsDone = phase2Sessions.reduce((sum, s) => sum + s.questionsDone, 0);
       const targetQs = 3000;
       const progress = Math.min(100, Math.round((qsDone / targetQs) * 100));
       return { id: 2, name: "Phase 2: Intensive Practice", targetDate: phase2End, daysLeft: Math.max(0, differenceInDays(phase2End, today)), metricName: "Questions Solved", metricValue: `${qsDone} / ${targetQs}`, progress, phases };
     } else {
-      const phase3Sessions = sessions.filter(s => new Date(s.date) > phase2End);
+      const phase3Sessions = sessions.filter(s => {
+        const d = new Date(s.date);
+        d.setHours(0, 0, 0, 0);
+        return d > phase2End;
+      });
       const mocksTaken = phase3Sessions.length;
       const targetMocks = 30;
       const progress = Math.min(100, Math.round((mocksTaken / targetMocks) * 100));
@@ -671,7 +790,9 @@ export default function Dashboard() {
 
   const getDaysToPhase1End = () => {
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const target = new Date(today.getFullYear(), 6, 18);
+    target.setHours(0, 0, 0, 0);
     if (today > target) return 0;
     return differenceInDays(target, today);
   };
@@ -1770,11 +1891,17 @@ export default function Dashboard() {
                   <div style={{ fontSize: '0.75rem', fontWeight: 800, opacity: 0.8, textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '0.75rem' }}>CURRENT STATUS</div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                     <div>
-                      <div style={{ fontSize: '2.75rem', fontWeight: 900, letterSpacing: '-1px' }}>PHASE {syllabusPhase}</div>
-                      <div style={{ fontSize: '0.9rem', fontWeight: 600, opacity: 0.9, marginTop: '0.25rem' }}>Foundation & Critical Topics</div>
+                      <div style={{ fontSize: '2.75rem', fontWeight: 900, letterSpacing: '-1px' }}>PHASE {phaseInfo.id}</div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 600, opacity: 0.9, marginTop: '0.25rem' }}>
+                        {phaseInfo.id === 1 
+                          ? "Foundation & Critical Topics" 
+                          : phaseInfo.id === 2 
+                            ? "Practice & Intensive Prep" 
+                            : "Mock Test Marathon"}
+                      </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '3.5rem', fontWeight: 900, lineHeight: 1 }}>66</div>
+                      <div style={{ fontSize: '3.5rem', fontWeight: 900, lineHeight: 1 }}>{phaseInfo.daysLeft}</div>
                       <div style={{ fontSize: '0.7rem', fontWeight: 800, opacity: 0.8, textTransform: 'uppercase' }}>Days Remaining</div>
                     </div>
                   </div>
@@ -1787,7 +1914,11 @@ export default function Dashboard() {
               {/* Primary: CAT Countdown */}
               {(() => {
                 const catExam = UPCOMING_EXAMS[0];
-                const dLeft = differenceInDays(catExam.date, new Date());
+                const normalizedToday = new Date();
+                normalizedToday.setHours(0, 0, 0, 0);
+                const normalizedCatExamDate = new Date(catExam.date);
+                normalizedCatExamDate.setHours(0, 0, 0, 0);
+                const dLeft = differenceInDays(normalizedCatExamDate, normalizedToday);
                 return (
                   <div className={`${styles.largeCard} ${styles.largeCardSecondary}`}>
                     <div style={{ position: 'relative', zIndex: 2 }}>
@@ -1814,7 +1945,11 @@ export default function Dashboard() {
             {/* Secondary Exams Row */}
             <div className={styles.smallCardsGrid}>
               {UPCOMING_EXAMS.slice(1).map(exam => {
-                const dLeft = differenceInDays(exam.date, new Date());
+                const normalizedToday = new Date();
+                normalizedToday.setHours(0, 0, 0, 0);
+                const normalizedExamDate = new Date(exam.date);
+                normalizedExamDate.setHours(0, 0, 0, 0);
+                const dLeft = differenceInDays(normalizedExamDate, normalizedToday);
                 return (
                   <div key={exam.id} style={{ background: 'white', padding: '1.5rem', borderRadius: '20px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem', transition: 'transform 0.2s', cursor: 'pointer' }} onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-4px)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1851,13 +1986,20 @@ export default function Dashboard() {
                   {(() => {
                     const quantsPlans = [ALGEBRA_PLAN, ARITHMETIC_PLAN, GEOMETRY_PLAN, MODERN_MATHS_PLAN];
                     const recommended = getRecommendedTopic(quantsPlans);
-                    const isDone = dailyTasks.some(t => t.date === format(new Date(), 'yyyy-MM-dd') && t.taskName === 'quants_mission' && t.completed);
+                    const todayStr = previewDate || format(new Date(), 'yyyy-MM-dd');
+                    const isDone = dailyTasks.some(t => t.date === todayStr && t.taskName === 'quants_mission' && t.completed);
                     
                     // Calculate Day X of Y
                     let dayInfo = '';
                     if (recommended) {
-                      const today = new Date();
+                      let today = new Date();
+                      if (previewDate) {
+                        const [y, m, d] = previewDate.split('-').map(Number);
+                        today = new Date(y, m - 1, d);
+                      }
+                      today.setHours(0, 0, 0, 0);
                       const taskStart = new Date(today.getFullYear(), recommended.startMonth, recommended.startDay);
+                      taskStart.setHours(0, 0, 0, 0);
                       const dayOfTask = differenceInDays(today, taskStart) + 1;
                       dayInfo = `Day ${dayOfTask} of ${recommended.days}`;
                     }
@@ -1908,13 +2050,20 @@ export default function Dashboard() {
                   {(() => {
                     const lrdiPlans = [LR_PLAN, DI_PLAN];
                     const recommended = getRecommendedTopic(lrdiPlans);
-                    const isDone = dailyTasks.some(t => t.date === format(new Date(), 'yyyy-MM-dd') && t.taskName === 'lrdi_mission' && t.completed);
+                    const todayStr = previewDate || format(new Date(), 'yyyy-MM-dd');
+                    const isDone = dailyTasks.some(t => t.date === todayStr && t.taskName === 'lrdi_mission' && t.completed);
                     
                     // Calculate Day X of Y
                     let dayInfo = '';
                     if (recommended) {
-                      const today = new Date();
+                      let today = new Date();
+                      if (previewDate) {
+                        const [y, m, d] = previewDate.split('-').map(Number);
+                        today = new Date(y, m - 1, d);
+                      }
+                      today.setHours(0, 0, 0, 0);
                       const taskStart = new Date(today.getFullYear(), recommended.startMonth, recommended.startDay);
+                      taskStart.setHours(0, 0, 0, 0);
                       const dayOfTask = differenceInDays(today, taskStart) + 1;
                       dayInfo = `Day ${dayOfTask} of ${recommended.days}`;
                     }
@@ -1963,7 +2112,8 @@ export default function Dashboard() {
 
                   {/* Newspaper Mission */}
                   {(() => {
-                    const isDone = dailyTasks.some(t => t.date === format(new Date(), 'yyyy-MM-dd') && t.taskName === 'newspaper_mission' && t.completed);
+                    const todayStr = previewDate || format(new Date(), 'yyyy-MM-dd');
+                    const isDone = dailyTasks.some(t => t.date === todayStr && t.taskName === 'newspaper_mission' && t.completed);
                     
                     return (
                       <div className={styles.missionItem} style={{ opacity: isDone ? 0.6 : 1 }}>
@@ -2047,16 +2197,72 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </div>
-                <div style={{ padding: '1.25rem 1.5rem', background: '#F8FAFC', borderTop: '1px solid var(--border-color)' }}>
-                  <button className={styles.missionStartBtn} onClick={() => setModalState('setup')} style={{ width: '100%', margin: 0, padding: '1rem', fontSize: '1rem' }}>
-                    <Play size={20} fill="currentColor" /> Start Today's Focus
+                <div style={{ padding: '1.25rem 1.5rem', background: '#F8FAFC', borderTop: '1px solid var(--border-color)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <button className={styles.missionStartBtn} onClick={() => setModalState('setup')} style={{ margin: 0, padding: '0.85rem', fontSize: '0.9rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                    <Play size={18} fill="currentColor" /> Start Focus
                   </button>
+                  {(() => {
+                    const todayStr = previewDate || format(new Date(), 'yyyy-MM-dd');
+                    const isSubmitted = dailyTasks.some(t => t.date === todayStr && t.taskName === 'day_submit' && t.completed);
+                    
+                    // Display nice date for non-today submissions
+                    const isToday = todayStr === format(new Date(), 'yyyy-MM-dd');
+                    const buttonText = isSubmitted 
+                      ? "Day Submitted! ✓" 
+                      : isToday 
+                        ? "Submit Today's Plan" 
+                        : `Submit Plan (${format(new Date(todayStr + 'T00:00:00'), 'MMM dd')})`;
+                        
+                    return (
+                      <button 
+                        onClick={() => handleToggleMission('day_submit')}
+                        style={{ 
+                          margin: 0, 
+                          padding: '0.85rem', 
+                          fontSize: '0.9rem', 
+                          fontWeight: 700,
+                          borderRadius: '12px',
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          gap: '0.5rem',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                          background: isSubmitted ? '#10B981' : 'var(--accent-primary)',
+                          color: 'white',
+                          border: 'none',
+                          boxShadow: isSubmitted 
+                            ? '0 4px 14px rgba(16, 185, 129, 0.3)' 
+                            : '0 4px 14px rgba(139, 92, 246, 0.3)'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = isSubmitted 
+                            ? '0 6px 20px rgba(16, 185, 129, 0.4)' 
+                            : '0 6px 20px rgba(139, 92, 246, 0.4)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = isSubmitted 
+                            ? '0 4px 14px rgba(16, 185, 129, 0.3)' 
+                            : '0 4px 14px rgba(139, 92, 246, 0.3)';
+                        }}
+                      >
+                        {isSubmitted ? (
+                          <CheckCircle2 size={18} strokeWidth={2.5} />
+                        ) : (
+                          <Send size={18} />
+                        )}
+                        {buttonText}
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
 
               <section className={styles.section}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                  <h2 className={styles.sectionTitle} style={{ marginBottom: 0 }}><FileText size={24} color="#8B5CF6" /> Formula Vault</h2>
+                  <h2 className={styles.sectionTitle}><FileText size={24} color="#8B5CF6" /> Formula Vault</h2>
                   <button 
                     className={styles.uploadBtn}
                     onClick={() => fileInputRef.current?.click()}
@@ -2165,6 +2371,7 @@ export default function Dashboard() {
             <div className={`${styles.card} ${styles.cardTertiary}`}><div className={styles.cardHeader}><span className={styles.cardTitle}>Practice Qs Done</span><div className={`${styles.cardIcon} ${styles.cardIconTertiary}`}><Target size={20} /></div></div><div className={styles.cardValue}>{totalQuestions}</div><div className={styles.cardSubtext}>Problems solved</div></div>
             <div className={`${styles.card} ${styles.cardSuccess}`}><div className={styles.cardHeader}><span className={styles.cardTitle}>{phaseInfo.metricName}</span><div className={`${styles.cardIcon} ${styles.cardIconSuccess}`}><Target size={20} /></div></div><div className={styles.cardValue}>{phaseInfo.metricValue}</div><div className={styles.cardSubtext}>{phaseInfo.name}</div></div>
             <div className={`${styles.card} ${styles.cardSuccess}`} style={{ background: 'var(--bg-main)', border: '1px solid var(--border-color)' }}><div className={styles.cardHeader}><span className={styles.cardTitle}>Current Streak</span><div className={`${styles.cardIcon} ${styles.cardIconSuccess}`}><Flame size={20} /></div></div><div className={styles.cardValue}>{calculateStreak()} Days</div><div className={styles.cardSubtext}>Keep going!</div></div>
+            <div className={`${styles.card} ${styles.cardSuccess}`} style={{ background: 'var(--bg-main)', border: '1px solid var(--border-color)' }}><div className={styles.cardHeader}><span className={styles.cardTitle}>Submission Streak</span><div className={`${styles.cardIcon} ${styles.cardIconSuccess}`} style={{ color: '#10B981', background: 'rgba(16, 185, 129, 0.1)' }}><Flame size={20} /></div></div><div className={styles.cardValue}>{calculateSubmissionStreak()} Days</div><div className={styles.cardSubtext}>Plan submission streak</div></div>
           </div>
           <div className={styles.analyticsGrid}>
             <div className={styles.analyticsCard}>
@@ -2267,6 +2474,22 @@ export default function Dashboard() {
                       const isDone = dailyTasks.some(t => t.date === dateStr && t.taskName === 'newspaper_mission' && t.completed);
                       return (
                         <div key={i} title={format(d, 'MMM dd')} style={{ width: '18px', height: '18px', borderRadius: '4px', background: isDone ? '#F59E0B' : 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.02)' }} />
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#10B981', textTransform: 'uppercase' }}>Daily Plan Submissions</span>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>{dailyTasks.filter(t => t.taskName === 'day_submit' && t.completed).length} Days Submitted</span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {Array.from({ length: 30 }).map((_, i) => {
+                      const d = subDays(new Date(), 29 - i);
+                      const dateStr = format(d, 'yyyy-MM-dd');
+                      const isDone = dailyTasks.some(t => t.date === dateStr && t.taskName === 'day_submit' && t.completed);
+                      return (
+                        <div key={i} title={format(d, 'MMM dd')} style={{ width: '18px', height: '18px', borderRadius: '4px', background: isDone ? '#10B981' : 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.02)' }} />
                       );
                     })}
                   </div>
